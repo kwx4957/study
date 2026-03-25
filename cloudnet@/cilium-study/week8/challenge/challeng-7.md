@@ -1,0 +1,1 @@
+- `도전과제7` Securing Elasticsearch - [Docs](https://docs.cilium.io/en/stable/security/elasticsearch/)

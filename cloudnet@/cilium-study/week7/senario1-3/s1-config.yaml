@@ -1,0 +1,19 @@
+global:
+  measurements:
+    - name: none
+
+jobs:
+  - name: create-deployments
+    jobType: create
+    jobIterations: 300  # How many times to execute the job
+    qps: 300           # Limit object creation queries per second 초당 최대 요청 수 (평균 속도 제한)
+    burst: 300        # Maximum burst for throttle , 순간적으로 처리 가능한 요청 최대치 (버퍼) - burst: 20이면 한순간에 최대 20개까지 처리 가능
+    namespace: kube-burner-test
+    namespaceLabels: {kube-burner-job: delete-me} # ns 라벨링 
+    waitWhenFinished: false # true 
+    verifyObjects: false 
+    preLoadImages: false # true
+    preLoadPeriod: 30s # default 1m
+    objects:
+      - objectTemplate: s1-deployment.yaml
+        replicas: 1

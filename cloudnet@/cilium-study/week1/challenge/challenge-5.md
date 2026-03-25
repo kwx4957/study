@@ -1,0 +1,1 @@
+- `도전과제` 파드 내 Socket-Based LB 기법이 문제가 되는 환경을 재연(istio, Longhorn 등)해보고, 파드내 Socket LB를 Off해서 해결해보

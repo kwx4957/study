@@ -1,0 +1,1 @@
+- `도전과제` vagrant box 를 Rocky linux 로 실습 환경 배포 해보기 - [box_image](https://portal.cloud.hashicorp.com/vagrant/discover/rockylinux)

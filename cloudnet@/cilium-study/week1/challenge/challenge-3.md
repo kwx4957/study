@@ -1,0 +1,1 @@
+- `도전과제` Cilium 시스템 요구 사항을 점검하는 ‘Bash Script 나 Ansible Playbook’ 를 만들어서 적용해보기

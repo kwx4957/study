@@ -1,0 +1,29 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 30000
+    hostPort: 30000
+  - containerPort: 30001
+    hostPort: 30001
+  - containerPort: 30002
+    hostPort: 30002
+  - containerPort: 30003
+    hostPort: 30003
+  kubeadmConfigPatches: # Prometheus Target connection refused bind-address 설정
+  - |
+    kind: ClusterConfiguration
+    controllerManager:
+      extraArgs:
+        bind-address: 0.0.0.0
+    etcd:
+      local:
+        extraArgs:
+          listen-metrics-urls: http://0.0.0.0:2381
+    scheduler:
+      extraArgs:
+        bind-address: 0.0.0.0
+  - |
+    kind: KubeProxyConfiguration
+    metricsBindAddress: 0.0.0.0

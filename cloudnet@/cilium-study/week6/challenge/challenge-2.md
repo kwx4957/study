@@ -1,0 +1,10 @@
+
+- `도전과제2-1` ~~Ingress gRPC Example~~ : arm64 CPU 미지원 - [Docs](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/grpc/)
+- `도전과제2-2` Traffic Splitting Example : `backendRefs.**weight:90**` - [Docs](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/splitting/)
+- `도전과제2-3` HTTP Header Modifier Examples : `filters.type.**RequestHeaderModifier**` - [Docs](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/header/)
+- `도전과제2-4` GatewayClass Parameters Support - [Docs](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/parameterized-gatewayclass/)
+- `도전과제2-5` GAMMA Support : 실습은 별도 없어서, 직접 실습 내용은 검색 후 해보기 - [Docs](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gamma/)
+- `도전과제2-6` Isovalent 에 Gateway API 온라인 실습 따라해보고 정리하기 - [GW_Lab1](https://isovalent.com/labs/cilium-gateway-api/) , [GW_Lab2](https://isovalent.com/labs/cilium-gateway-api-advanced/)
+- `도전과제2-7` Migrating from Ingress to Gateway : 기존 Ingress 를 → Gateway API로 마이그레이션 - [Docs](https://docs.cilium.io/en/stable/network/servicemesh/ingress-to-gateway/ingress-to-gateway/)
+    - HTTP Migration Example - [Docs](https://docs.cilium.io/en/stable/network/servicemesh/ingress-to-gateway/http-migration/)
+    - TLS Migration - [Docs](https://docs.cilium.io/en/stable/network/servicemesh/ingress-to-gateway/tls-migration/)

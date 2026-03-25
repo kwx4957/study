@@ -1,0 +1,8 @@
+### Index
+1. Bootstrap k8s the hard way
+2. Ansible 기초
+3. Kubeadm Upgrade 및 Node Join
+4. Kubespray 배포 및 Playbook 분석
+5. HA 구성 및 버전 업그레이드 
+6. kubespray air-gap(offline) 설치
+7. RKE2 및 Cluster Api 구성

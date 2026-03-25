@@ -1,0 +1,23 @@
+prometheus:
+  prometheusSpec:
+    scrapeInterval: "15s"
+    evaluationInterval: "15s"
+  service:
+    type: NodePort
+    nodePort: 30001
+
+grafana:
+  defaultDashboardsTimezone: Asia/Seoul
+  adminPassword: prom-operator
+  service:
+    type: NodePort
+    nodePort: 30002
+
+alertmanager:
+  enabled: false
+defaultRules:
+  create: false
+prometheus-windows-exporter:
+  prometheus:
+    monitor:
+      enabled: false

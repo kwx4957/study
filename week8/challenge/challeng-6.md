@@ -1,0 +1,1 @@
+- `도전과제6` Securing a Kafka Cluster - [Docs](https://docs.cilium.io/en/stable/security/kafka/)

@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-{{ .Iteration}}-{{.Replica}}
+  labels:
+    app: test-{{ .Iteration }}-{{.Replica}}
+    kube-burner-job: delete-me
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-{{ .Iteration}}-{{.Replica}}
+  template:
+    metadata:
+      labels:
+        app: test-{{ .Iteration}}-{{.Replica}}
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80

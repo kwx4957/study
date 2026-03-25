@@ -1,0 +1,3 @@
+- `도전과제4` Cilium 과 FRR 간 **BGP** 연동 시, 보안을 위해 **MD5 Password** 설정을 해보시기 바랍니다 - [Docs](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane-v2/#bgp-peer-configuration)
+- `도전과제5` **L2 Announcement** + Service(LB EX-IP, ExternalTrafficPolicy:Cluster) + DSR + Maglev 설정 후 인입 과정 분석
+- `도전과제6` kind 와 같은 네트워크로 **frr** 컨테이너를 배포(**bgp config** 주입)하여, cilium 과 BGP(ECMP) + LB IPAM 로 인입 설정해보기

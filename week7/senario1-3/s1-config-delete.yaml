@@ -1,0 +1,17 @@
+# global:
+#   measurements:
+#     - name: none
+
+jobs:
+  - name: delete-deployments-namespace
+    qps: 500
+    burst: 500
+    namespace: kube-burner-test
+    jobType: delete
+    waitWhenFinished: true
+    objects:
+    - kind: Deployment
+      labelSelector: {kube-burner-job: delete-me}
+      apiVersion: apps/v1
+    - kind: Namespace
+      labelSelector: {kube-burner-job: delete-me}

@@ -1,0 +1,1 @@
+- `도전과제` kind k8s 에 Flannel CNI 환경에서 최소 중단 전략을 통해 Cilium CNI 마이그레이션(노드 단위) 가이드 실습 따라해보기 - [Docs](https://docs.cilium.io/en/stable/installation/k8s-install-migration/)

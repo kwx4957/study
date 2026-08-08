@@ -1,6 +1,6 @@
 # vLLM on Colab T4
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kwx4957/study/blob/master/03.llm-serving/week1/gpu.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kwx4957/study/blob/master/03.llm-serving/week1/vllm_on_colab_t4.ipynb)
 
 ## 목표
 LLM을 구성하는 복잡한 수식의 세부적인 원리를 규명하는 데 초점을 맞추기보다, 제한된 자원 환경에서 LLM의 성능을 개선하기 위해 LLM이 어떠한 방식으로 동작하며 어떤 비효율성을 내포하고 있는지를 분석하고, 이를 해결하기 위한 방향을 모색하여 향후 시스템을 어떻게 설계해야 하는지를 이해하는 데 중점을 둔다.

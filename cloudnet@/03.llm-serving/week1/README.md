@@ -90,7 +90,7 @@ Installed 36 packages in 670ms
 첫 실행은 하나의 긴 프롬프트를 생성해 vLLM 로드와 생성 흐름이 정상인지 확인한다. 이 단계에서 보는 값 다음과 같다. 
 - 모델 로드 시간
 - 생성 시간
-- 생성 토큰 수다. 
+- 생성 토큰 수
 
 ```python
 # 약 4분 소요
@@ -192,9 +192,23 @@ gpu 자원 사용량 확인
 ```
 
 ## 3. 기본 설정과 배치 설정 비교
+다음 조건으로 실행을 진행했다.  
+- 동일한 모델 Qwen2.5-0.5B
+- 동일한 프롬프트와 생성 조건을 사용
+- 동시 요청 수를 1 / 32 / 64 / 128
 
-동일한 모델인 Qwen2.5-0.5B, 동일한 프롬프트와 생성 조건을 사용하고, 동시 요청 수를 1 / 32 / 64 / 128로 변화시키면서 성능을 측정했습니다. 비교 지표는 모델 로딩 시간, 요청 처리 시간, Requests/sec, Output tokens/sec이며, 이를 통해 튜닝이 단일 요청 지연시간과 다중 요청 처리량에 어떤 영향을 주는지 확인했다.
-튜닝 설정에는 max_model_len, gpu_memory_utilization, max_num_seqs, Prefix Caching, Chunked Prefill, CUDA Graph 관련 옵션 등이 포함되어 있으며, 동시 요청이 증가할 때 vLLM의 스케줄링과 KV Cache 관리 최적화가 처리량 향상에 얼마나 기여하는지 확인하는 것이 실험의 주요 목적입니다.
+비교 지표는 다음과 같아. 이를 통해 튜닝이 단일 요청 지연시간과 다중 요청 처리량에 어떤 영향을 주는지 확인했다.  
+- 요청 처리 시간
+- Requests/sec
+- Output tokens/sec
+
+튜닝 설정에는 관련 옵션 등이 포함되어 있으며, 동시 요청이 증가할 때 vLLM의 스케줄링과 KV Cache 관리 최적화가 처리량 향상에 얼마나 기여하는지 확인하는 것이 실험의 주요 목적이다.  
+- max_model_len
+- gpu_memory_utilization
+- max_num_seqs
+- Prefix Caching
+- Chunked Prefill
+- CUDA Graph 
 
 공통 코드 설정 
 ```python

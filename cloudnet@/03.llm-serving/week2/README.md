@@ -2,7 +2,7 @@
 ### 프로덕션급 모델 서빙이 왜 어려운가?
 
 > 간단하게 말하자면 고민(선택) 사항이 너무 방대하기 때문이다.
-> 
+
 1. 모델을 서빙하기 위해 어떤 환경의 모델을 선택할 것인가?
     1. 클라우드 벤더에서 제공하는 API 또는 서빙 환경
     2. 자체 인프라 구축 
@@ -90,20 +90,41 @@
 ChatGPT를 기준으로 설명하자면, 웹 UI형태의 서비스 또는 LLM 시스템이 앞단에서 가장 먼저 사용자(고객 or 개발자)를 마주하는 인터페이스라고 볼수 있다. 사용자가 요청을 보내면 가장 먼저 Public API 계층을 통과하게 되고, `사용자에 따라 인증 및 요청 제한, 보안 정책 등을 처리한다.
 
 - Authentication
+  - API Key에 대한 인증 요청 처리
+- Authorization
+  - 어떤 모델을 사용할수 있는가? 예들 들어 3만원대의 프로 요금제를 결제한 사용자가 10만원대 요금에서 사용가능할 모델을 사용하면 안되는 권한을 검증한다.     
 - Rate Limit
-- Tenant
+- Tenant 
 - Routing
 - Security
+- Billing
+  - 사용자의 API 사용량을 계산한다.  
 
-앞단에서 HTTPS의 요청을 받아서 HTTPRoute 정의 기반으로 백단으로 라우팅을 처리한다
+1계층에서 k8s가 담당하는 역할과 서비스에서 담당하는 역할을 분리한다면 다음과 같은 구조를 가질 것이다. 
 
+```yaml
+Kubernetes / Gateway
+├── Gateway API
+├── HTTPRoute
+├── TLS
+├── Routing
+└── Rate Limit / Security
+
+External / Platform Services
+├── Identity Provider
+├── API Key
+├── WAF / DDoS
+├── Billing
+├── Usage
+├── Kafka
+└── Policy Management
 ```
-**https://api.example.com/v1/chat/completions -> Gatewayy API -> LLM-API:8080**
-```
+
+1계층은 외부 요청을 내부 서비스로 전달하는 것이 아니라, `누가 요청했는지`, `사용할 수 있는 요청인지`, `얼마나 사용할 수 있는지`, 그리고 `사용한 자원을 어떻게 기록할 것인지`를 관리한다.
 
 ### 2계층 Resource Management
 
-LLM을 실행하기 위해 필요한 인프라 자원을 관리한다. GPU가 존재하는 것이 아니라 어떤 workload에 어떤 GPU를 할당할 것인가이다.
+LLM을 실행하기 위해 필요한 인프라 자원을 관리한다. GPU 존재 여부보다 어떤 workload에 어떤 GPU를 할당할 것인가?
 
 - CPU
 - GPU

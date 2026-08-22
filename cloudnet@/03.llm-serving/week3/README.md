@@ -2,6 +2,8 @@
 
 > Kodecloud의 vllm 실습을 통해 운영 환경에서 왜 vLLM이 적합한지를 정리한 내용입니다.
 
+HuggingFace와 vLLM을 비교하며 KV Cache, PagedAttention, Continuous Batching의 원리를 이해하고, 실제 운영 환경에서 고성능 LLM 서빙을 위한 성능 최적화을 실습한다.
+
 ## 목차
 
 | Task  | Script                     | TODOs | Key Skill                            |

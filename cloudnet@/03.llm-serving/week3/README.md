@@ -2217,7 +2217,24 @@ if __name__ == "__main__":
 <details>
 <summary> 핵심 요약</summary>
 
-vLLM 서버를 여러 설정으로 바꿔가며 재시작하면서 파라미터에 따라 처리량 / 레이선시가 어떻게 달라지는 비교한다. 
+vLLM 서버를 여러 설정으로 바꿔가며 재시작하면서 처리량 / 레이선시가 어떻게 달라지는 비교한다. 
+
+- max_model_len : 최대 Conetxt 길이로 KV Cache 크기를 결정한다. 길이가 길면 메모리 사용량 증가한다. 이 값을 낮춘다면 KV Cache에 저장을 적게 하기 떄문에 메모리 절약ㄱ 및 더 많은 요청을 수용할수 있지만 긴 프롬프트는 처리할수 없다.
+- max_num_seqs : 최대 배치 크기를 의미한다. 값이 높다면 처리량 증가하고 메모리 사용량이 증가하지만 값을 낮게하면 메모리가 감소하는 대신, 처리량이 감소한다.
+- swap_space : KV Cache를 cpu ram으로 확장한다. gpu 매모리가 부족하면 cpu ram을 활용하여 더 많은 요청을 처리할수 있게한다. 대신 메모리가 병목이 발생할수 있다
+
+1. Config A는 기본 vLLM 설정으로 약 92.7/s 토큰을 처리한다.
+2. Config B는 KV cache 메모리가 감소하여, 처리 효율이 약간 향상되었지만, 크게 유의미한 성능 차이가 보이진 않는다.
+3. Config C는 최대 배치 크기를 감소하여, gpu 활용률이 많이 떨어져 처리랑이 크게 감소할 것을 확인할 수가 있따.
+
+```sh
+--- CONFIGURATION COMPARISON ---
+Config                  max_model_len  max_num_seqs  Throughput   Latency
+------------------------------------------------------------------------
+A: Default                        128           256     92.7 tok/s    5.25s
+B: Shorter Context                 64           256     94.6 tok/s    5.15s
+C: Limited Concurrency             64             8     61.0 tok/s    5.29s
+```
 
 ```python
 def stop_server():

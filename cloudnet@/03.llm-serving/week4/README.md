@@ -7,7 +7,7 @@
 - [3. LM Cache 동작 테스트](#3-lm-cache-동작-테스트)
 - [4. LM Cache 실행 및 벤치](#4-lm-cache-실행-및-벤치)
   - [4.1 LM Cache bench bench test](#41-lm-cache-bench-bench-test)
-- [5.](#5)
+- [5. LM Cache & vllm 실행](#5-lm-cache--vllm-실행)
 - [6. vllm이 LM Cache 사용한 경우와 사용하지 않은 경우 비교](#6-vllm이-lm-cache-사용한-경우와-사용하지-않은-경우-비교)
   - [6.1 LM Cache 비활성화 로그](#61-lm-cache-비활성화-로그)
   - [6.2 LM Cache 활성화 로그](#62-lm-cache-활성화-로그)
@@ -137,116 +137,132 @@ kill %1
 
 ### 4.1 LM Cache bench bench test
 
- ```python
-   [info] --transfer-mode=lmcache_driven on cpu mode: using REGISTER_KV_CACHE + STORE/RETRIEVE over POSIX SHM
- Connecting to LMCache MP Server at tcp://127.0.0.1:5555 (mode=cpu) ...
- Server chunk_size = 256
- Resolved KV shape spec: (2,1024,16,8,128):float16:32
- Each request: 513 tokens (2 full chunks)
- KV shape: 32 layers, 8 heads x 128, dtype=float16, blocks=1024x16, kv=2
+```python
+Server chunk_size = 256
+Resolved KV shape spec: (2,1024,16,8,128):float16:32
+Each request: 513 tokens (2 full chunks)
+KV shape: 32 layers, 8 heads x 128, dtype=float16, blocks=1024x16, kv=2
 
- [rank 0] Allocated 32 CPU SHM tensors (prefix=/lmcache_kv_62532_r0)
-  LMCache INFO: Engine KV Format: EngineKVFormat.NL_X_TWO_NB_NH_BS_HS NL x [2, NB, NH, BS, HS] (detection.py:69:lmcache.v1.gpu_connector.kv_format.detection)
-  LMCache INFO: Engine KV Format: EngineKVFormat.NL_X_TWO_NB_NH_BS_HS NL x [2, NB, NH, BS, HS] (detection.py:69:lmcache.v1.gpu_connector.kv_format.detection)
-  LMCache INFO: Group 0 first-layer tensor: layer_idx=0 shape=(2, 1024, 16, 8, 128) stride=(16777216, 16384, 1024, 128, 1) is_contiguous=True dtype=torch.float16 device=cpu storage_offset=0 numel=33554432 storage_nbytes=67108864 padding_per_block=0 (utils.py:603:lmcache.v1.gpu_connector.utils)
-  LMCache INFO: group 0: compressed (tokens_per_block=16, slots_per_block=8) (kv_layer_groups.py:767:lmcache.v1.kv_layer_groups)
-  LMCache INFO: KV layer groups: ---
- KernelGroupInfo(layers=32, indices=0-31, shape_desc=(kv=2, nl=32, nb=1024, bs=8, nh=16, hs=128, element_size=2, block_stride_elems=0), dtype=torch.float16, tokens_per_block=16, slots_per_block=8, engine_group_idx=0, sw_size_tokens=-1)
- --- (kv_layer_groups.py:474:lmcache.v1.kv_layer_groups)
-  LMCache INFO: CPUCacheContext: 32 layers, 1024 blocks, dtype=torch.float16 (shm-backed) (cache_context.py:186:lmcache.v1.platform.cpu.cache_context)
-  LMCache INFO: Registered KV cache for GPU ID 1000 with 32 layers (lmcache_driven_transfer.py:1010:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
- [rank 0] REGISTER_KV_CACHE: OK
- 
- === Request seq=0 ===
-   [seq 0/cold] LOOKUP: 0/2 chunks hit (1.6 ms)
-  LMCache INFO: AffinityThreadPool: affinity_key=-5391682848642878554 assigned to worker slot 0 of 1 (thread affinity-pool-0-0); 1 distinct key(s) now bound (affinity_pool.py:108:lmcache.v1.multiprocess.affinity_pool)
-  LMCache INFO: Stored 512 tokens in 0.163 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-   [seq 0/cold] STORE: stored (512 tokens, 163.9 ms, 1 writers)
- INFO:     127.0.0.1:51086 - "POST /cache/checksums HTTP/1.1" 200 OK
-   [seq 0/cold] CHECKSUM: dc71eaa56d6cdfb5 (2 chunks)
-  LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-0-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-   [seq 0/warm] LOOKUP: 2/2 chunks hit (1.9 ms)
-  LMCache INFO: Retrieved 512 tokens in 0.094 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-   [seq 0/warm] RETRIEVE: retrieved (512 tokens, 95.3 ms, 1 workers)
- INFO:     127.0.0.1:51090 - "POST /cache/checksums HTTP/1.1" 200 OK
-   [seq 0/warm] CHECKSUM: dc71eaa56d6cdfb5 (2 chunks)
-   [seq 0] CHECKSUM MATCH OK
- 
- === Request seq=1 ===
-   [seq 1/cold] LOOKUP: 0/2 chunks hit (1.5 ms)
-  LMCache INFO: Stored 512 tokens in 0.089 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-   [seq 1/cold] STORE: stored (512 tokens, 90.4 ms, 1 writers)
- INFO:     127.0.0.1:51098 - "POST /cache/checksums HTTP/1.1" 200 OK
-   [seq 1/cold] CHECKSUM: deef9de748d32e88 (2 chunks)
-  LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-1-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-   [seq 1/warm] LOOKUP: 2/2 chunks hit (2.2 ms)
-  LMCache INFO: Retrieved 512 tokens in 0.036 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-   [seq 1/warm] RETRIEVE: retrieved (512 tokens, 37.1 ms, 1 workers)
- INFO:     127.0.0.1:51114 - "POST /cache/checksums HTTP/1.1" 200 OK
-   [seq 1/warm] CHECKSUM: deef9de748d32e88 (2 chunks)
-   [seq 1] CHECKSUM MATCH OK
- 
- === Request seq=2 ===
-   [seq 2/cold] LOOKUP: 0/2 chunks hit (2.0 ms)
-  LMCache INFO: Stored 512 tokens in 0.075 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-   [seq 2/cold] STORE: stored (512 tokens, 76.5 ms, 1 writers)
- INFO:     127.0.0.1:51120 - "POST /cache/checksums HTTP/1.1" 200 OK
-   [seq 2/cold] CHECKSUM: 6fecbf59cb3d3a2e (2 chunks)
-  LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-2-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-   [seq 2/warm] LOOKUP: 2/2 chunks hit (2.1 ms)
-  LMCache INFO: Retrieved 512 tokens in 0.033 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-   [seq 2/warm] RETRIEVE: retrieved (512 tokens, 33.6 ms, 1 workers)
- INFO:     127.0.0.1:51128 - "POST /cache/checksums HTTP/1.1" 200 OK
-   [seq 2/warm] CHECKSUM: 6fecbf59cb3d3a2e (2 chunks)
-   [seq 2] CHECKSUM MATCH OK
- 
-  LMCache INFO: Unregistered KV cache for GPU ID 1000 (lmcache_driven_transfer.py:1037:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
- [iid 1000] UNREGISTER_KV_CACHE: OK
- ===================== Server Bench Result ======================
- ------------------------ Configuration -------------------------
- RPC URL:                                    tcp://127.0.0.1:5555
- Mode:                                                        cpu
- Transfer mode:                                    lmcache_driven
- Tokens / request:                                            512
- Interval (s):                                               0.50
- --------------------------- Results ----------------------------
- Total requests:                                                3
- Checksum OK:                                                   3
- Checksum FAIL:                                                 0
- Pass rate (%):                                            100.00
- ----------------------- Cold Lookup (ms) -----------------------
- count:                                                         3
- mean:                                                       1.73
- min:                                                        1.53
- max:                                                        2.04
- p50:                                                        1.62
- p99:                                                        2.04
- ----------------------- Cold Store (ms) ------------------------
- count:                                                         3
- mean:                                                     110.25
- min:                                                       76.48
- max:                                                      163.86
- p50:                                                       90.40
- p99:                                                      163.86
- ----------------------- Warm Lookup (ms) -----------------------
- count:                                                         3
- mean:                                                       2.07
- min:                                                        1.85
- max:                                                        2.24
- p50:                                                        2.12
- p99:                                                        2.24
- ---------------------- Warm Retrieve (ms) ----------------------
- count:                                                         3
- mean:                                                      55.35
- min:                                                       33.57
- max:                                                       95.34
- p50:                                                       37.15
- p99:                                                       95.34
- ================================================================
- Done.
- ```
+[rank 0] Allocated 32 CPU SHM tensors (prefix=/lmcache_kv_62532_r0)
+LMCache INFO: Engine KV Format: EngineKVFormat.NL_X_TWO_NB_NH_BS_HS NL x [2, NB, NH, BS, HS] (detection.py:69:lmcache.v1.gpu_connector.kv_format.detection)
+LMCache INFO: Engine KV Format: EngineKVFormat.NL_X_TWO_NB_NH_BS_HS NL x [2, NB, NH, BS, HS] (detection.py:69:lmcache.v1.gpu_connector.kv_format.detection)
+LMCache INFO: Group 0 first-layer tensor: layer_idx=0 shape=(2, 1024, 16, 8, 128) stride=(16777216, 16384, 1024, 128, 1) is_contiguous=True dtype=torch.float16 device=cpu storage_offset=0 numel=33554432 storage_nbytes=67108864 padding_per_block=0 (utils.py:603:lmcache.v1.gpu_connector.utils)
+LMCache INFO: group 0: compressed (tokens_per_block=16, slots_per_block=8) (kv_layer_groups.py:767:lmcache.v1.kv_layer_groups)
+LMCache INFO: KV layer groups: ---
+KernelGroupInfo(layers=32, indices=0-31, shape_desc=(kv=2, nl=32, nb=1024, bs=8, nh=16, hs=128, element_size=2, block_stride_elems=0), dtype=torch.float16, tokens_per_block=16, slots_per_block=8, engine_group_idx=0, sw_size_tokens=-1)
+--- (kv_layer_groups.py:474:lmcache.v1.kv_layer_groups)
+LMCache INFO: CPUCacheContext: 32 layers, 1024 blocks, dtype=torch.float16 (shm-backed) (cache_context.py:186:lmcache.v1.platform.cpu.cache_context)
+LMCache INFO: Registered KV cache for GPU ID 1000 with 32 layers (lmcache_driven_transfer.py:1010:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+[rank 0] REGISTER_KV_CACHE: OK
 
-### 5. 
+=== Request seq=0 ===
+ [seq 0/cold] LOOKUP: 0/2 chunks hit (1.6 ms)
+LMCache INFO: AffinityThreadPool: affinity_key=-5391682848642878554 assigned to worker slot 0 of 1 (thread affinity-pool-0-0); 1 distinct key(s) now bound (affinity_pool.py:108:lmcache.v1.multiprocess.affinity_pool)
+LMCache INFO: Stored 512 tokens in 0.163 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+ [seq 0/cold] STORE: stored (512 tokens, 163.9 ms, 1 writers)
+INFO:     127.0.0.1:51086 - "POST /cache/checksums HTTP/1.1" 200 OK
+ [seq 0/cold] CHECKSUM: dc71eaa56d6cdfb5 (2 chunks)
+LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-0-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+ [seq 0/warm] LOOKUP: 2/2 chunks hit (1.9 ms)
+LMCache INFO: Retrieved 512 tokens in 0.094 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+ [seq 0/warm] RETRIEVE: retrieved (512 tokens, 95.3 ms, 1 workers)
+INFO:     127.0.0.1:51090 - "POST /cache/checksums HTTP/1.1" 200 OK
+ [seq 0/warm] CHECKSUM: dc71eaa56d6cdfb5 (2 chunks)
+ [seq 0] CHECKSUM MATCH OK
+
+=== Request seq=1 ===
+ [seq 1/cold] LOOKUP: 0/2 chunks hit (1.5 ms)
+LMCache INFO: Stored 512 tokens in 0.089 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+ [seq 1/cold] STORE: stored (512 tokens, 90.4 ms, 1 writers)
+INFO:     127.0.0.1:51098 - "POST /cache/checksums HTTP/1.1" 200 OK
+ [seq 1/cold] CHECKSUM: deef9de748d32e88 (2 chunks)
+LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-1-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+ [seq 1/warm] LOOKUP: 2/2 chunks hit (2.2 ms)
+LMCache INFO: Retrieved 512 tokens in 0.036 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+ [seq 1/warm] RETRIEVE: retrieved (512 tokens, 37.1 ms, 1 workers)
+INFO:     127.0.0.1:51114 - "POST /cache/checksums HTTP/1.1" 200 OK
+ [seq 1/warm] CHECKSUM: deef9de748d32e88 (2 chunks)
+ [seq 1] CHECKSUM MATCH OK
+
+=== Request seq=2 ===
+ [seq 2/cold] LOOKUP: 0/2 chunks hit (2.0 ms)
+LMCache INFO: Stored 512 tokens in 0.075 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+ [seq 2/cold] STORE: stored (512 tokens, 76.5 ms, 1 writers)
+INFO:     127.0.0.1:51120 - "POST /cache/checksums HTTP/1.1" 200 OK
+ [seq 2/cold] CHECKSUM: 6fecbf59cb3d3a2e (2 chunks)
+LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-2-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+ [seq 2/warm] LOOKUP: 2/2 chunks hit (2.1 ms)
+LMCache INFO: Retrieved 512 tokens in 0.033 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+ [seq 2/warm] RETRIEVE: retrieved (512 tokens, 33.6 ms, 1 workers)
+INFO:     127.0.0.1:51128 - "POST /cache/checksums HTTP/1.1" 200 OK
+ [seq 2/warm] CHECKSUM: 6fecbf59cb3d3a2e (2 chunks)
+ [seq 2] CHECKSUM MATCH OK
+
+LMCache INFO: Unregistered KV cache for GPU ID 1000 (lmcache_driven_transfer.py:1037:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+[iid 1000] UNREGISTER_KV_CACHE: OK
+===================== Server Bench Result ======================
+------------------------ Configuration -------------------------
+RPC URL:                                    tcp://127.0.0.1:5555
+Mode:                                                        cpu
+Transfer mode:                                    lmcache_driven
+Tokens / request:                                            512
+Interval (s):                                               0.50
+--------------------------- Results ----------------------------
+Total requests:                                                3
+Checksum OK:                                                   3
+Checksum FAIL:                                                 0
+Pass rate (%):                                            100.00
+----------------------- Cold Lookup (ms) -----------------------
+count:                                                         3
+mean:                                                       1.73
+min:                                                        1.53
+max:                                                        2.04
+p50:                                                        1.62
+p99:                                                        2.04
+----------------------- Cold Store (ms) ------------------------
+count:                                                         3
+mean:                                                     110.25
+min:                                                       76.48
+max:                                                      163.86
+p50:                                                       90.40
+p99:                                                      163.86
+----------------------- Warm Lookup (ms) -----------------------
+count:                                                         3
+mean:                                                       2.07
+min:                                                        1.85
+max:                                                        2.24
+p50:                                                        2.12
+p99:                                                        2.24
+---------------------- Warm Retrieve (ms) ----------------------
+count:                                                         3
+mean:                                                      55.35
+min:                                                       33.57
+max:                                                       95.34
+p50:                                                       37.15
+p99:                                                       95.34
+================================================================
+Done.
+```
+
+lm cache가 L1에 kv cache를 저장 및 조회하는지 검증한 결과이다. 
+
+| 항목            |            평균 |      P50 |       P99 |
+| ------------- | ------------: | -------: | --------: |
+| Cold Lookup   |   **1.73 ms** |  1.62 ms |   2.04 ms |
+| Cold Store    | **110.25 ms** | 90.40 ms | 163.86 ms |
+| Warm Lookup   |   **2.07 ms** |  2.12 ms |   2.24 ms |
+| Warm Retrieve |  **55.35 ms** | 37.15 ms |  95.34 ms |
+
+### 5. LM Cache & vllm 실행
+
+2번의 프롬프트를 요청하여 LM Cache와 vllm이 함께 동작하는지 테스트한다. 
+
+vllm에서 lm cache 연결 설정
+- LMCacheMPConnector : LMCache 연결 설정
+- kv_both : vllm이 kv cache를 lm cahe를 통해 저장 및 조회하도록 설정
+- kv_connector_module_path.lmcache.integration.vllm.lmcache_mp_connector : kv 캐시를 저장 및 조회하는 양쪽 역할 모두 수행
+- kv_connector_extra_config.lmcache.mp.host : LMCache의 LMCacheMPConnector Python 모듈을 사용합니다. localhost:5555
+- lmcache.mp.mp_transfer_mode : LMCache가 KV Cache 전송을 주도하는 방식
 
 ```python
 # Memory budget for a 16 GB MacBook (safe defaults):
@@ -264,7 +280,7 @@ kill %1
 #   --max-model-len 300
 #   --max-num-seqs 1
 
-# Terminal A: start LMCache server
+# 터미널 A) start LMCache server
 source ~/projects-test/.venv-lmcache/bin/activate
  
 lmcache server \
@@ -274,7 +290,7 @@ lmcache server \
   --eviction-policy LRU
   
   
-# Terminal B: start vLLM (macOS arm64)
+# 터미널 B) start vLLM (macOS arm64)
 source ~/projects-test/.venv-lmcache/bin/activate
  
 # === CRITICAL: avoid vLLM OMP deadlock on macOS arm64 ===
@@ -309,7 +325,7 @@ vllm serve facebook/opt-125m \
     }
   }'
   
-# Terminal C: verify cache hit
+# 터미널 C) verify cache hit
 source ~/projects-test/.venv-lmcache/bin/activate
  
 cat > /tmp/test_lmcache_e2e.py <<'EOF'
@@ -377,47 +393,54 @@ vllm serve facebook/opt-125m \
 ```
 
 ### 6.1 LM Cache 비활성화 로그
+
+chatgpt
+LMCache를 사용하지 않는 Baseline 환경으로 vLLM을 CPU에서 실행했으며, Prefix Caching은 비활성화하고 Triton/oneDNN 최적화 없이 V1 Model Runner와 PyTorch 연산으로 정상 기동한 상태이다.
+
+<details>
+<summary> log </summary>
+  
 ```bash
 Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
 WARNING 08-28 16:45:33 [importing.py:72] Triton is installed, but doesn't include CPU backend. Disabling Triton.
 INFO 08-28 16:45:33 [importing.py:95] Triton not installed or not compatible; certain GPU-related functions will not be available.
-(APIServer pid=112750) INFO 08-28 16:45:50 [api_utils.py:347]
-(APIServer pid=112750) INFO 08-28 16:45:50 [api_utils.py:347]        █     █     █▄   ▄█
-(APIServer pid=112750) INFO 08-28 16:45:50 [api_utils.py:347]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.28.1.dev202608260651
-(APIServer pid=112750) INFO 08-28 16:45:50 [api_utils.py:347]   █▄█▀ █     █     █     █  model   /root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6
-(APIServer pid=112750) INFO 08-28 16:45:50 [api_utils.py:347]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
-(APIServer pid=112750) INFO 08-28 16:45:50 [api_utils.py:347]
-(APIServer pid=112750) INFO 08-28 16:45:50 [api_utils.py:286] non-default args: {'model_tag': '/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', 'port': 18000, 'model': '/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', 'dtype': 'bfloat16', 'max_model_len': 2048, 'enable_prefix_caching': False, 'max_num_seqs': 1, 'disable_hybrid_kv_cache_manager': True}
-(APIServer pid=112750) WARNING 08-28 16:45:50 [envs.py:2239] Unknown vLLM environment variable detected: VLLM_DEVICE
-(APIServer pid=112750) INFO 08-28 16:45:50 [model.py:684] Resolved architecture: OPTForCausalLM
-(APIServer pid=112750) WARNING 08-28 16:45:50 [model.py:2355] Casting torch.float16 to torch.bfloat16.
-(APIServer pid=112750) INFO 08-28 16:45:50 [model.py:2021] Using max model len 2048
-(APIServer pid=112750) INFO 08-28 16:45:50 [kernel.py:365] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
-(APIServer pid=112750) WARNING 08-28 16:45:50 [vllm.py:681] Model Runner V2 requires Triton; using the V1 model runner instead.
-INFO 08-28 16:47:19 [importing.py:60] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
-WARNING 08-28 16:47:19 [importing.py:72] Triton is installed, but doesn't include CPU backend. Disabling Triton.
-INFO 08-28 16:47:19 [importing.py:95] Triton not installed or not compatible; certain GPU-related functions will not be available.
-(EngineCore pid=112825) INFO 08-28 16:47:32 [core.py:123] Initializing a V1 LLM engine (v0.28.1.dev202608260651) with config: model='/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', speculative_config=None, tokenizer='/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=2048, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=True, quantization=None, quantization_config=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cpu, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6, enable_prefix_caching=False, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.DYNAMO_TRACE_ONCE: 2>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': False, 'splitting_ops': [], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': None, 'compile_ranges_endpoints': [2048], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'dce': True, 'size_asserts': False, 'nan_asserts': False, 'epilogue_fusion': True, 'cpp.dynamic_threads': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.NONE: 0>, 'cudagraph_num_of_warmups': 0, 'cudagraph_capture_sizes': [], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': None, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native']), enable_flashinfer_autotune=True, enable_cutedsl_warmup=True, enable_jit_warmup=True, enable_bf16x3_router_gemm=False, moe_backend='auto', linear_backend='auto')
-(EngineCore pid=112825) INFO 08-28 16:47:32 [multiproc_executor.py:153] DP group leader: node_rank=0, node_rank_within_dp=0, master_addr=127.0.0.1, mq_connect_ip=127.0.0.1 (local), world_size=1, local_world_size=1
-(EngineCore pid=112825) INFO 08-28 16:47:32 [ompmultiprocessing.py:185] OpenMP thread binding info:
-(EngineCore pid=112825) INFO 08-28 16:47:32 [ompmultiprocessing.py:185]         VLLM_CPU_OMP_THREADS_BIND='auto', auto_setup=True, skip_setup=False
-(EngineCore pid=112825) INFO 08-28 16:47:32 [ompmultiprocessing.py:185]         local_world_size=1, reserve_cpu_num=1
-(EngineCore pid=112825) INFO 08-28 16:47:32 [ompmultiprocessing.py:185]         local_rank=0, core ids=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-(EngineCore pid=112825) INFO 08-28 16:47:32 [ompmultiprocessing.py:185]         reserved_cpus=[19]
-INFO 08-28 16:48:37 [importing.py:60] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
-WARNING 08-28 16:48:37 [importing.py:72] Triton is installed, but doesn't include CPU backend. Disabling Triton.
-INFO 08-28 16:48:37 [importing.py:95] Triton not installed or not compatible; certain GPU-related functions will not be available.
-WARNING 08-28 16:48:49 [vllm.py:681] Model Runner V2 requires Triton; using the V1 model runner instead.
-(Worker pid=112945) WARNING 08-28 16:48:49 [cpu_worker.py:127] libtcmalloc is not found in LD_PRELOAD. For best performance, please follow the section `set LD_PRELOAD` in https://docs.vllm.ai/en/latest/getting_started/installation/cpu/ to setup required pre-loaded libraries.
-(Worker pid=112945) WARNING 08-28 16:48:49 [cpu_worker.py:127] libiomp is not found in LD_PRELOAD. For best performance, please follow the section `set LD_PRELOAD` in https://docs.vllm.ai/en/latest/getting_started/installation/cpu/ to setup required pre-loaded libraries.
-(Worker pid=112945) INFO 08-28 16:48:49 [parallel_state.py:1638] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/vllm_dist_2297b0ed49e84efdadc3c3c15f7fccf5 backend=gloo
-(Worker pid=112945) INFO 08-28 16:48:50 [parallel_state.py:1982] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank N/A, EPLB rank N/A
-(Worker pid=112945) INFO 08-28 16:48:50 [cpu_model_runner.py:131] Starting to load model /root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6...
+        █     █     █▄   ▄█
+  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.28.1.dev202608260651
+   █▄█▀ █     █     █     █  model   /root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6
+    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+
+[api_utils.py:286] non-default args: {'model_tag': '/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', 'port': 18000, 'model': '/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', 'dtype': 'bfloat16', 'max_model_len': 2048, 'enable_prefix_caching': False, 'max_num_seqs': 1, 'disable_hybrid_kv_cache_manager': True}
+[envs.py:2239] Unknown vLLM environment variable detected: VLLM_DEVICE
+[model.py:684] Resolved architecture: OPTForCausalLM
+[model.py:2355] Casting torch.float16 to torch.bfloat16.
+ [model.py:2021] Using max model len 2048
+  [kernel.py:365] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+ [vllm.py:681] Model Runner V2 requires Triton; using the V1 model runner instead.
+ [importing.py:60] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
+WARNING [importing.py:72] Triton is installed, but doesn't include CPU backend. Disabling Triton.
+[importing.py:95] Triton not installed or not compatible; certain GPU-related functions will not be available.
+
+(EngineCore pid=112825)2 [core.py:123] Initializing a V1 LLM engine (v0.28.1.dev202608260651) with config: model='/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', speculative_config=None, tokenizer='/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=2048, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=True, quantization=None, quantization_config=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cpu, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6, enable_prefix_caching=False, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.DYNAMO_TRACE_ONCE: 2>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': False, 'splitting_ops': [], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': None, 'compile_ranges_endpoints': [2048], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'dce': True, 'size_asserts': False, 'nan_asserts': False, 'epilogue_fusion': True, 'cpp.dynamic_threads': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.NONE: 0>, 'cudagraph_num_of_warmups': 0, 'cudagraph_capture_sizes': [], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': None, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native']), enable_flashinfer_autotune=True, enable_cutedsl_warmup=True, enable_jit_warmup=True, enable_bf16x3_router_gemm=False, moe_backend='auto', linear_backend='auto')
+
+[multiproc_executor.py:153] DP group leader: node_rank=0, node_rank_within_dp=0, master_addr=127.0.0.1, mq_connect_ip=127.0.0.1 (local), world_size=1, local_world_size=1
+[ompmultiprocessing.py:185] OpenMP thread binding info:
+[ompmultiprocessing.py:185]         VLLM_CPU_OMP_THREADS_BIND='auto', auto_setup=True, skip_setup=False
+[ompmultiprocessing.py:185]         local_world_size=1, reserve_cpu_num=1
+[ompmultiprocessing.py:185]         local_rank=0, core ids=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+[ompmultiprocessing.py:185]         reserved_cpus=[19]
+[importing.py:60] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
+[importing.py:72] Triton is installed, but doesn't include CPU backend. Disabling Triton.
+[importing.py:95] Triton not installed or not compatible; certain GPU-related functions will not be available.
+[vllm.py:681] Model Runner V2 requires Triton; using the V1 model runner instead.
+[cpu_worker.py:127] libtcmalloc is not found in LD_PRELOAD. For best performance, please follow the section `set LD_PRELOAD` in https://docs.vllm.ai/en/latest/getting_started/installation/cpu/ to setup required pre-loaded libraries.
+[cpu_worker.py:127] libiomp is not found in LD_PRELOAD. For best performance, please follow the section `set LD_PRELOAD` in https://docs.vllm.ai/en/latest/getting_started/installation/cpu/ to setup required pre-loaded libraries.
+[parallel_state.py:1638] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/vllm_dist_2297b0ed49e84efdadc3c3c15f7fccf5 backend=gloo
+[parallel_state.py:1982] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank N/A, EPLB rank N/A
+[cpu_model_runner.py:131] Starting to load model /root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6...
 Loading pt checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]
 Loading pt checkpoint shards: 100% Completed | 1/1 [00:01<00:00,  1.62s/it]
 Loading pt checkpoint shards: 100% Completed | 1/1 [00:01<00:00,  1.62s/it]
-(Worker pid=112945)
-(Worker pid=112945) INFO 08-28 16:48:52 [default_loader.py:430] Loading weights took 1.62 seconds
+[default_loader.py:430] Loading weights took 1.62 seconds
 (Worker pid=112945) WARNING 08-28 16:48:52 [utils.py:371] Failed to create oneDNN linear, fallback to torch linear. Exception: could not create a primitive descriptor for the matmul primitive. Run workload with environment variable ONEDNN_VERBOSE=all to get additional diagnostic information.
 (EngineCore pid=112825) INFO 08-28 16:48:52 [torch_utils.py:277] Reducing Torch threads from 10 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
 (EngineCore pid=112825) INFO 08-28 16:48:52 [utils.py:305] Using LBHNC KV cache layout.
@@ -431,47 +454,28 @@ Loading pt checkpoint shards: 100% Completed | 1/1 [00:01<00:00,  1.62s/it]
 (EngineCore pid=112825) WARNING 08-28 16:49:35 [vllm.py:681] Model Runner V2 requires Triton; using the V1 model runner instead.
 (EngineCore pid=112825) WARNING 08-28 16:49:35 [vllm.py:1420] Inductor compilation was disabled by user settings, optimizations settings that are only active during inductor compilation will be ignored.
 (EngineCore pid=112825) INFO 08-28 16:49:35 [kernel.py:365] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
-(APIServer pid=112750) INFO 08-28 16:49:35 [entry.py:135] Supported tasks: ['generate']
-(APIServer pid=112750) INFO 08-28 16:49:36 [hf.py:547] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
-(APIServer pid=112750) INFO 08-28 16:49:36 [entry.py:139] Starting vLLM server on http://0.0.0.0:18000
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:61] Available routes are:
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /openapi.json, Methods: HEAD, GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /docs, Methods: HEAD, GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /docs/oauth2-redirect, Methods: HEAD, GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /redoc, Methods: HEAD, GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /load, Methods: GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /version, Methods: GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /health, Methods: GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /metrics, Methods: GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /tokenize, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /detokenize, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/models, Methods: GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /ping, Methods: GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /ping, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /invocations, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/chat/completions, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/chat/completions/batch, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/responses, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/responses/{response_id}, Methods: GET
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/responses/{response_id}/cancel, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/completions, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/messages, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/messages/count_tokens, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /generative_scoring, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /scale_elastic_ep, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /is_scaling_elastic_ep, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/chat/completions/render, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/messages/render, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/completions/render, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/chat/completions/derender, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /v1/completions/derender, Methods: POST
-(APIServer pid=112750) INFO 08-28 16:49:36 [launcher.py:70] Route: /inference/v1/generate, Methods: POST
-(APIServer pid=112750) INFO:     Started server process [112750]
-(APIServer pid=112750) INFO:     Waiting for application startup.
-(APIServer pid=112750) INFO:     Application startup complete.
+ [entry.py:135] Supported tasks: ['generate']
+ [hf.py:547] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+ [entry.py:139] Starting vLLM server on http://0.0.0.0:18000
+ [launcher.py:61] Available routes are:
+ [launcher.py:70] Route: /openapi.json, Methods: HEAD, GET
+...
+ INFO:     Started server process [112750]
+ INFO:     Waiting for application startup.
+ INFO:     Application startup complete.
 ```
 
+</details>
+
+
 ### 6.2 LM Cache 활성화 로그
+
+chatgpt
+현재 vLLM은 GPU가 아닌 CPU 모드로 정상 기동했고, Triton은 GPU backend가 없어 비활성화되어 V1 Model Runner로 fallback됐다. LMCache는 CPU KV Cache를 대상으로 정상 초기화되었으며, 12개 layer × 227 blocks의 BF16 KV Cache 약 1 GiB를 Shared Memory에 backing storage로 구성했다.
+
+<details>
+<summary> log </summary>
+
 ```bash
 # LM Cache 로그 
 [2026-08-28 17:01:18,476] LMCache INFO: Engine KV Format: EngineKVFormat.NL_X_NB_NH_BS_CS NL x [NB, NH, BS, CS] (detection.py:69:lmcache.v1.gpu_connector.kv_format.detection)
@@ -488,19 +492,19 @@ KernelGroupInfo(layers=12, indices=0-11, shape_desc=(kv=1, nl=12, nb=227, bs=128
 INFO 08-28 16:57:34 [importing.py:60] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
 WARNING 08-28 16:57:34 [importing.py:72] Triton is installed, but doesn't include CPU backend. Disabling Triton.
 INFO 08-28 16:57:34 [importing.py:95] Triton not installed or not compatible; certain GPU-related functions will not be available.
-(APIServer pid=113327) INFO 08-28 16:57:55 [api_utils.py:347]
-(APIServer pid=113327) INFO 08-28 16:57:55 [api_utils.py:347]        █     █     █▄   ▄█
-(APIServer pid=113327) INFO 08-28 16:57:55 [api_utils.py:347]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.28.1.dev202608260651
-(APIServer pid=113327) INFO 08-28 16:57:55 [api_utils.py:347]   █▄█▀ █     █     █     █  model   /root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6
-(APIServer pid=113327) INFO 08-28 16:57:55 [api_utils.py:347]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
-(APIServer pid=113327) INFO 08-28 16:57:55 [api_utils.py:347]
-(APIServer pid=113327) INFO 08-28 16:57:55 [api_utils.py:286] non-default args: {'model_tag': '/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', 'port': 18000, 'model': '/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', 'dtype': 'bfloat16', 'max_model_len': 2048, 'served_model_name': ['facebook/opt-125m'], 'enable_prefix_caching': False, 'max_num_seqs': 1, 'disable_hybrid_kv_cache_manager': True, 'kv_transfer_config': KVTransferConfig(kv_connector='LMCacheMPConnector', engine_id='6c040150-6696-42b3-9e5f-715927849fb6', kv_buffer_device='cpu', kv_buffer_size=1000000000.0, kv_role='kv_both', kv_rank=None, kv_parallel_size=1, kv_ip='127.0.0.1', kv_port=14579, kv_connector_extra_config={'lmcache.mp.host': 'tcp://localhost', 'lmcache.mp.port': 5555, 'lmcache.mp.mp_transfer_mode': 'lmcache_driven'}, kv_connector_module_path='lmcache.integration.vllm.lmcache_mp_connector', enable_permute_local_kv=False, kv_load_failure_policy='fail')}
-(APIServer pid=113327) WARNING 08-28 16:57:55 [envs.py:2239] Unknown vLLM environment variable detected: VLLM_DEVICE
-(APIServer pid=113327) INFO 08-28 16:57:55 [model.py:684] Resolved architecture: OPTForCausalLM
-(APIServer pid=113327) WARNING 08-28 16:57:55 [model.py:2355] Casting torch.float16 to torch.bfloat16.
-(APIServer pid=113327) INFO 08-28 16:57:55 [model.py:2021] Using max model len 2048
-(APIServer pid=113327) INFO 08-28 16:57:55 [kernel.py:365] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
-(APIServer pid=113327) WARNING 08-28 16:57:56 [vllm.py:681] Model Runner V2 requires Triton; using the V1 model runner instead.
+ INFO 08-28 16:57:55 
+ INFO 08-28 16:57:55         █     █     █▄   ▄█
+ INFO 08-28 16:57:55   ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.28.1.dev202608260651
+ INFO 08-28 16:57:55    █▄█▀ █     █     █     █  model   /root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6
+ INFO 08-28 16:57:55     ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+ INFO 08-28 16:57:55 
+ INFO 08-28 16:57:55 [api_utils.py:286] non-default args: {'model_tag': '/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', 'port': 18000, 'model': '/root/.cache/huggingface/hub/models--facebook--opt-125m/snapshots/27dcfa74d334bc871f3234de431e71c6eeba5dd6', 'dtype': 'bfloat16', 'max_model_len': 2048, 'served_model_name': ['facebook/opt-125m'], 'enable_prefix_caching': False, 'max_num_seqs': 1, 'disable_hybrid_kv_cache_manager': True, 'kv_transfer_config': KVTransferConfig(kv_connector='LMCacheMPConnector', engine_id='6c040150-6696-42b3-9e5f-715927849fb6', kv_buffer_device='cpu', kv_buffer_size=1000000000.0, kv_role='kv_both', kv_rank=None, kv_parallel_size=1, kv_ip='127.0.0.1', kv_port=14579, kv_connector_extra_config={'lmcache.mp.host': 'tcp://localhost', 'lmcache.mp.port': 5555, 'lmcache.mp.mp_transfer_mode': 'lmcache_driven'}, kv_connector_module_path='lmcache.integration.vllm.lmcache_mp_connector', enable_permute_local_kv=False, kv_load_failure_policy='fail')}
+ WARNING 08-28 16:57:55 [envs.py:2239] Unknown vLLM environment variable detected: VLLM_DEVICE
+ INFO 08-28 16:57:55 [model.py:684] Resolved architecture: OPTForCausalLM
+ WARNING 08-28 16:57:55 [model.py:2355] Casting torch.float16 to torch.bfloat16.
+ INFO 08-28 16:57:55 [model.py:2021] Using max model len 2048
+ INFO 08-28 16:57:55 [kernel.py:365] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+ WARNING 08-28 16:57:56 [vllm.py:681] Model Runner V2 requires Triton; using the V1 model runner instead.
 INFO 08-28 16:59:12 [importing.py:60] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
 WARNING 08-28 16:59:12 [importing.py:72] Triton is installed, but doesn't include CPU backend. Disabling Triton.
 INFO 08-28 16:59:12 [importing.py:95] Triton not installed or not compatible; certain GPU-related functions will not be available.
@@ -571,47 +575,20 @@ Loading pt checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  3.71it/s]
 (EngineCore pid=113410) WARNING 08-28 17:01:20 [vllm.py:681] Model Runner V2 requires Triton; using the V1 model runner instead.
 (EngineCore pid=113410) WARNING 08-28 17:01:21 [vllm.py:1420] Inductor compilation was disabled by user settings, optimizations settings that are only active during inductor compilation will be ignored.
 (EngineCore pid=113410) INFO 08-28 17:01:21 [kernel.py:365] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
-(APIServer pid=113327) [2026-08-28 17:01:22,270] LMCache INFO: torch_dev=StubCPUDevice(device_type=cpu), torch_device_type=cpu (_device_detect.py:312:lmcache.v1.platform._device_detect)
-(APIServer pid=113327) [2026-08-28 17:01:23,112] LMCache INFO: multi_layer_block_kv_transfer mode: tensor (base.py:95:lmcache.v1.multiprocess.transfer_context.base)
-(APIServer pid=113327) INFO 08-28 17:01:23 [entry.py:135] Supported tasks: ['generate']
-(APIServer pid=113327) INFO 08-28 17:01:23 [hf.py:547] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
-(APIServer pid=113327) INFO 08-28 17:01:23 [entry.py:139] Starting vLLM server on http://0.0.0.0:18000
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:61] Available routes are:
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /openapi.json, Methods: HEAD, GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /docs, Methods: HEAD, GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /docs/oauth2-redirect, Methods: HEAD, GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /redoc, Methods: HEAD, GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /load, Methods: GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /version, Methods: GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /health, Methods: GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /metrics, Methods: GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /tokenize, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /detokenize, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/models, Methods: GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /ping, Methods: GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /ping, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /invocations, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/chat/completions, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/chat/completions/batch, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/responses, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/responses/{response_id}, Methods: GET
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/responses/{response_id}/cancel, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/completions, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/messages, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/messages/count_tokens, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /generative_scoring, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /scale_elastic_ep, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /is_scaling_elastic_ep, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/chat/completions/render, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/messages/render, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/completions/render, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/chat/completions/derender, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /v1/completions/derender, Methods: POST
-(APIServer pid=113327) INFO 08-28 17:01:23 [launcher.py:70] Route: /inference/v1/generate, Methods: POST
-(APIServer pid=113327) INFO:     Started server process [113327]
-(APIServer pid=113327) INFO:     Waiting for application startup.
-(APIServer pid=113327) INFO:     Application startup complete.
+ [2026-08-28 17:01:22,270] LMCache INFO: torch_dev=StubCPUDevice(device_type=cpu), torch_device_type=cpu (_device_detect.py:312:lmcache.v1.platform._device_detect)
+ [2026-08-28 17:01:23,112] LMCache INFO: multi_layer_block_kv_transfer mode: tensor (base.py:95:lmcache.v1.multiprocess.transfer_context.base)
+ INFO 08-28 17:01:23 [entry.py:135] Supported tasks: ['generate']
+ INFO 08-28 17:01:23 [hf.py:547] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+ INFO 08-28 17:01:23 [entry.py:139] Starting vLLM server on http://0.0.0.0:18000
+ INFO 08-28 17:01:23 [launcher.py:61] Available routes are:
+ INFO 08-28 17:01:23 [launcher.py:70] Route: /openapi.json, Methods: HEAD, GET
+...
+ INFO:     Started server process [113327]
+ INFO:     Waiting for application startup.
+ INFO:     Application startup complete.
 ```
+</details>
+
 
 ### 7. vllm 요청 테스트 
 

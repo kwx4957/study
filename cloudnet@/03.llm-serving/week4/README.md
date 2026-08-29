@@ -1,5 +1,7 @@
 ## LLM Serving 스터디 4주차
 
+> LLM Serving 환경에서 KV Cache의 역할과 LMCache의 동작 원리를 이해하고, 실제 vLLM + LMCache 환경에서 반복되는 Prompt의 KV Cache를 재사용했을 때 성능이 얼마나 개선되는지 검증한다.
+
 ### 목차
 
 - [1.환경 설정](#1-환경-설정)

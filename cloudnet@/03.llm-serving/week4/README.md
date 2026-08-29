@@ -16,8 +16,8 @@
   - [7.2 LM Cache 활성화](#72-lm-cache-활성화)
   - [7.3 결과 정리](#73-결과-정리)
 - [8. python 요청 변경](#8-python-요청-변경)
-  - [8.1 LM Cache 비활성화](#81-lm-cache-비활성화)
-  - [8.2 LM Cache 활성화](#82-lm-cache-활성화)
+  - [8.1 LM Cache 활성화](#81-lm-cache-활성화)
+  - [8.2 LM Cache 비활성화](#82-lm-cache-비활성화)
   - [8.3 결과 정리](#83-결과-정리)
 
 ### 1. 환경 설정
@@ -730,6 +730,9 @@ LM Cache가 641개의 토큰 중 512개 토큰의 kv cache를 L1에 저장하여
 
 ### 8. python 요청 변경 
 
+같은 긴 프롬프트를 두 번 요청해서 1회차와 2회차의 응답 시간을 비교한다. 이때 같은 문장을 50번 반봇해서 의도적으로 긴 입력을 만든다. 예를 들어 다음과 같은 입력이다. Hello ... 0, Hello ... 1. 이를 통해 검증하는 것은 lm cache가 정상적으로 prefix의 kv caache를 재사용할수 있는지를 검사한다. 
+
+
 ```python
 from openai import OpenAI
 
@@ -799,11 +802,175 @@ for i in range(30):
     time_warm_lmcache.append(print_output_online(client, auto_prompt, sampling_params, "auto"))
 ```
 
-### 8.1 LM Cache 비활성화
+### 8.1 LM Cache 활성화
 
+```sh
+# pytohn log
+INFO 08-28 17:24:45 [importing.py:60] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
+WARNING 08-28 17:24:45 [importing.py:72] Triton is installed, but doesn't include CPU backend. Disabling Triton.
+INFO 08-28 17:24:45 [importing.py:95] Triton not installed or not compatible; certain GPU-related functions will not be available.
+First time 29
+Completion result: Completion(id='cmpl-8a2a6ad98b90101d', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Shane Jones Thompson from the Harps, I am very excited to take part in', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787905499, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-7acb7ee4', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 5.52 seconds, auto request done.
+--------------------------------------------------
+First time 28
+Completion result: Completion(id='cmpl-a8e97853fff7942a', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' James and I am discovering who Christ knows – I eat fish and curses – I', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787905500, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-7acb7ee4', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.27 seconds, auto request done.
+--------------------------------------------------
 
-### 8.2 LM Cache 활성화
+.................................................
 
+First time 2
+Completion result: Completion(id='cmpl-b57d2468f4259e93', choices=[CompletionChoice(finish_reason='stop', index=0, logprobs=None, text=' Nvolds', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787905534, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-7acb7ee4', usage=CompletionUsage(completion_tokens=4, prompt_tokens=706, total_tokens=710, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.22 seconds, auto request done.
+--------------------------------------------------
+First time 1
+Completion result: Completion(id='cmpl-923d96238ad455f8', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Fu shi, i am Fu shi. i am Fu shi came', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787905536, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-7acb7ee4', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.33 seconds, auto request done.
+--------------------------------------------------
+First time 0
+Completion result: Completion(id='cmpl-be3e8aa6cd461eed', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=', Wayland. I am a bouncer. I am Odupoma', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787905537, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-7acb7ee4', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.33 seconds, auto request done.
+--------------------------------------------------
+Second time 0
+Completion result: Completion(id='cmpl-b96599e9d2887a06', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=" Osiris James Jason I'm a free sumster from Fenton, Kentucky who came", stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787905538, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-7acb7ee4', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 0.51 seconds, auto request done.
+--------------------------------------------------
+Second time 1
+Completion result: Completion(id='cmpl-b112a6847198bcb4', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Chris, and my name is Katie. I love water sports so I always take', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787905539, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-7acb7ee4', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 0.51 seconds, auto request done.
+
+.................................................
+
+Second time 28
+Completion result: Completion(id='cmpl-98111aa09d894c26', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Rebecca and my person is You. Rebecca takes pleasure in fetching out the persons', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787905553, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-7acb7ee4', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 0.56 seconds, auto request done.
+--------------------------------------------------
+Second time 29
+Completion result: Completion(id='cmpl-ad069a534c8e08ca', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Ann?\nThanks so much.\nThere are no other words to describe this', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787905553, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-7acb7ee4', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 0.53 seconds, auto request done.
+--------------------------------------------------
+```
+```sh
+# lm cache log
+[2026-08-28 17:25:00,946] LMCache INFO: Stored 512 tokens in 0.276 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+[2026-08-28 17:25:02,051] LMCache INFO: Stored 512 tokens in 0.017 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+...
+[2026-08-28 17:25:37,236] LMCache INFO: Stored 512 tokens in 0.019 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+[2026-08-28 17:25:38,571] LMCache INFO: Stored 512 tokens in 0.023 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+
+[2026-08-28 17:25:38,731] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.5 ms (external_request_id=cmpl-b96599e9d2887a06-0-b5079ce3, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+[2026-08-28 17:25:38,740] LMCache INFO: Retrieved 512 tokens in 0.008 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+[2026-08-28 17:25:39,242] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.6 ms (external_request_id=cmpl-b112a6847198bcb4-0-b76a876c, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+[2026-08-28 17:25:39,248] LMCache INFO: Retrieved 512 tokens in 0.004 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+...
+[2026-08-28 17:25:53,250] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=cmpl-98111aa09d894c26-0-b4d2fff4, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+[2026-08-28 17:25:53,257] LMCache INFO: Retrieved 512 tokens in 0.005 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+[2026-08-28 17:25:53,808] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.5 ms (external_request_id=cmpl-ad069a534c8e08ca-0-933d22c5, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+[2026-08-28 17:25:53,814] LMCache INFO: Retrieved 512 tokens in 0.005 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+```
+```sh
+# vllm log
+(APIServer pid=113327) INFO 08-28 17:25:04 [loggers.py:310] Engine 000: Avg prompt throughput: 211.8 tokens/s, Avg generation throughput: 4.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 61.7%
+(APIServer pid=113327) INFO 08-28 17:25:14 [loggers.py:310] Engine 000: Avg prompt throughput: 564.8 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 44.8%
+(APIServer pid=113327) INFO 08-28 17:25:24 [loggers.py:310] Engine 000: Avg prompt throughput: 564.8 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 35.1%
+(APIServer pid=113327) INFO 08-28 17:25:34 [loggers.py:310] Engine 000: Avg prompt throughput: 494.2 tokens/s, Avg generation throughput: 11.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 29.6%
+(APIServer pid=113327) INFO 08-28 17:25:44 [loggers.py:310] Engine 000: Avg prompt throughput: 495.8 tokens/s, Avg generation throughput: 21.5 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 2.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 35.6%
+(APIServer pid=113327) INFO 08-28 17:25:54 [loggers.py:310] Engine 000: Avg prompt throughput: 368.6 tokens/s, Avg generation throughput: 31.0 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 2.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 44.5%
+(APIServer pid=113327) INFO 08-28 17:26:04 [loggers.py:310] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.7 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 44.5%
+(APIServer pid=113327) INFO 08-28 17:26:14 [loggers.py:310] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 44.5%
+```
+
+### 8.2 LM Cache 비활성화
+  
+```sh
+# python log
+INFO 08-28 17:40:05 [importing.py:60] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
+WARNING 08-28 17:40:05 [importing.py:72] Triton is installed, but doesn't include CPU backend. Disabling Triton.
+INFO 08-28 17:40:05 [importing.py:95] Triton not installed or not compatible; certain GPU-related functions will not be available.
+First time 29
+Completion result: Completion(id='cmpl-acf982d592499846', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Shane Jones Thompson from the Harps, I am very excited to take part in', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906421, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 5.77 seconds, auto request done.
+--------------------------------------------------
+First time 28
+Completion result: Completion(id='cmpl-8297034a48ded3f8', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' James and I am discovering who Christ knows – I eat fish and curses – I', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906422, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.33 seconds, auto request done.
+--------------------------------------------------
+
+...
+
+First time 2
+Completion result: Completion(id='cmpl-a5186cf44624251a', choices=[CompletionChoice(finish_reason='stop', index=0, logprobs=None, text=' Nvolds', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906457, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=4, prompt_tokens=706, total_tokens=710, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.21 seconds, auto request done.
+--------------------------------------------------
+First time 1
+Completion result: Completion(id='cmpl-a093c9ab3e063b40', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Fu shi, i am Fu shi. i am Fu shi came', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906459, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.35 seconds, auto request done.
+--------------------------------------------------
+First time 0
+Completion result: Completion(id='cmpl-9ff86da5c3712333', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=', Wayland. I am a bouncer. I am Odupoma', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906460, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.37 seconds, auto request done.
+--------------------------------------------------
+Second time 0
+Completion result: Completion(id='cmpl-a2e66f338a5c1761', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=" Osiris James Jason I'm a free sumster from Fenton, Kentucky who came", stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906461, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.37 seconds, auto request done.
+--------------------------------------------------
+Second time 1
+Completion result: Completion(id='cmpl-bad633b64015269e', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Chris, and my name is Katie. I love water sports so I always take', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906463, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.37 seconds, auto request done.
+--------------------------------------------------
+Second time 2
+Completion result: Completion(id='cmpl-b1d659682857f916', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=" Alan, I'm a young really young young girl from tweet\n\n", stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906464, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.38 seconds, auto request done.
+--------------------------------------------------
+...
+Second time 27
+Completion result: Completion(id='cmpl-98e2bf10f34f4b40', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Kahla not My name is Kahla on This This This is Currently A Sequ', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906500, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.44 seconds, auto request done.
+--------------------------------------------------
+Second time 28
+Completion result: Completion(id='cmpl-b1c60eb7aefa29b5', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Rebecca and my person is You. Rebecca takes pleasure in fetching out the persons', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906502, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.42 seconds, auto request done.
+--------------------------------------------------
+Second time 29
+Completion result: Completion(id='cmpl-84a6ef6e329b519c', choices=[CompletionChoice(finish_reason='length', index=0, logprobs=None, text=' Ann?\nThanks so much.\nThere are no other words to describe this', stop_reason=None, token_ids=None, prompt_logprobs=None, prompt_token_ids=None, routed_experts=None)], created=1787906503, model='facebook/opt-125m', object='text_completion', system_fingerprint='vllm-0.28.1.dev202608260651-68284efd', usage=CompletionUsage(completion_tokens=16, prompt_tokens=706, total_tokens=722, completion_tokens_details=None, prompt_tokens_details=None), service_tier=None, kv_transfer_params=None, ec_transfer_params=None, metrics=None)
+--------------------------------------------------
+Generation took 1.40 seconds, auto request done.
+--------------------------------------------------
+```
+
+```sh
+# vllm log
+(APIServer pid=114525) INFO 08-28 17:40:26 [loggers.py:310] Engine 000: Avg prompt throughput: 282.4 tokens/s, Avg generation throughput: 6.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=114525) INFO 08-28 17:40:36 [loggers.py:310] Engine 000: Avg prompt throughput: 564.7 tokens/s, Avg generation throughput: 11.3 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 2.7%, Prefix cache hit rate: 0.0%
+(APIServer pid=114525) INFO 08-28 17:40:46 [loggers.py:310] Engine 000: Avg prompt throughput: 494.2 tokens/s, Avg generation throughput: 12.7 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=114525) INFO 08-28 17:40:56 [loggers.py:310] Engine 000: Avg prompt throughput: 494.1 tokens/s, Avg generation throughput: 11.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=114525) INFO 08-28 17:41:06 [loggers.py:310] Engine 000: Avg prompt throughput: 494.2 tokens/s, Avg generation throughput: 10.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=114525) INFO 08-28 17:41:16 [loggers.py:310] Engine 000: Avg prompt throughput: 494.2 tokens/s, Avg generation throughput: 11.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=114525) INFO 08-28 17:41:26 [loggers.py:310] Engine 000: Avg prompt throughput: 494.2 tokens/s, Avg generation throughput: 11.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=114525) INFO 08-28 17:41:36 [loggers.py:310] Engine 000: Avg prompt throughput: 494.2 tokens/s, Avg generation throughput: 11.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=114525) INFO 08-28 17:41:46 [loggers.py:310] Engine 000: Avg prompt throughput: 423.6 tokens/s, Avg generation throughput: 9.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=114525) INFO 08-28 17:41:56 [loggers.py:310] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+```
 
 ### 8.3 결과 정리
 

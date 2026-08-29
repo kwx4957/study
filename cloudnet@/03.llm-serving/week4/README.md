@@ -974,157 +974,20 @@ Generation took 1.40 seconds, auto request done.
 
 ### 8.3 결과 정리
 
-## 1. 결론 요약
+LMCache 활성화 시 반복되는 Prefix의 KV Cache를 재사용하여 Prefill 연산을 줄일 수 있다.  
+동일한 706개의 토큰 프롬프트 반복 요청한 결과, Warm 구간의 평균 응답시간이 1.441초에서 0.521초로 감소하여 약 63.9%의 latency 개선과 2.77배의 처리속도 향상을 확인할 수 있다. 
 
-동일한 706-token 프롬프트를 반복 요청한 로그를 비교한 결과, **LMCache가 활성화되고 캐시가 준비된 Warm 구간의 평균 응답시간은 0.521초**, LMCache 미사용의 대응 구간은 **1.441초**였다.
-
-- 평균 응답시간 감소: **0.920초/요청**
-- 지연시간 개선율: **63.9%**
-- 처리 속도 배수: **2.77배**
-- 30회 누적시간: **43.23초 → 15.62초** (총 **27.61초 절감**)
-
-LMCache 서버 로그에서도 Cold 구간에 30회 저장, Warm 구간에 30회 조회가 확인됐다. Warm 요청마다 512 tokens가 L1에서 복원됐으며, 조회 자체는 평균 0.0053초였다. 따라서 이번 실험에서는 LMCache가 긴 프롬프트의 prefill 계산 일부를 재사용해 응답시간을 크게 줄였다고 판단할 수 있다.
-
-## 2. 분석 대상
-
-| 파일 | 역할 | 확인 내용 |
-|---|---|---|
-| `Python_LM_Cache_active_output.md` | LMCache ON 클라이언트 로그 | Cold 30회, Warm 30회 응답시간 |
-| `Python_LM_Cache_deactive_output.md` | LMCache OFF 클라이언트 로그 | 동일 구성의 2개 구간, 총 60회 응답시간 |
-| `LM_Cache_output.md` | LMCache 서버 로그 | 512-token 저장 30회, 조회 30회 및 소요시간 |
-| `vllm_LM_Cache_active_output.md` | LMCache ON vLLM 로그 | HTTP 200 60회, external cache hit 지표 |
-| `vllm_LM_Cache_deactive_output.md` | LMCache OFF vLLM 로그 | HTTP 200 60회, external cache 지표 없음 |
-
-모든 Python 응답에서 모델은 `facebook/opt-125m`, 입력은 706 tokens, 출력은 16 tokens였다. 두 실행 모두 `/v1/completions` 요청 60회가 HTTP 200으로 완료됐다.
-
-## 3. 비교 방법
-
-Python 로그의 다음 값을 요청별 end-to-end 응답시간으로 사용했다.
-
-```text
-Generation took N.NN seconds, auto request done.
-```
-
-LMCache ON 실행은 첫 30회가 서로 다른 프롬프트를 처음 처리하는 Cold/Store 구간이고, 다음 30회가 같은 프롬프트를 다시 처리하는 Warm/Retrieve 구간이다. LMCache OFF 실행도 동일하게 두 번째 30회를 대응 구간으로 사용했다.
-
-계산식은 다음과 같다.
-
-```text
-평균 = 요청시간 합계 / 요청 수
-개선율(%) = (OFF 평균 - ON Warm 평균) / OFF 평균 × 100
-속도 배수 = OFF 평균 / ON Warm 평균
-```
-
-## 4. Python 응답시간 결과
-
-| 조건 | 요청 수 | 평균 | 중앙값 | 최소 | 최대 | 합계 |
-|---|---:|---:|---:|---:|---:|---:|
-| LMCache ON — Cold 전체 | 30 | 1.445초 | 1.300초 | 1.220초 | 5.520초 | 43.34초 |
-| LMCache ON — Cold 안정 구간¹ | 29 | 1.304초 | 1.300초 | 1.220초 | 1.400초 | 37.82초 |
-| **LMCache ON — Warm** | **30** | **0.521초** | **0.520초** | **0.500초** | **0.560초** | **15.62초** |
-| LMCache OFF — 1차 전체 | 30 | 1.498초 | 1.350초 | 1.210초 | 5.770초 | 44.95초 |
-| LMCache OFF — 1차 안정 구간¹ | 29 | 1.351초 | 1.350초 | 1.210초 | 1.500초 | 39.18초 |
-| **LMCache OFF — 2차** | **30** | **1.441초** | **1.415초** | **1.350초** | **1.600초** | **43.23초** |
-
-¹ 각 실행의 첫 요청은 서버/모델 초기화 영향으로 각각 5.52초와 5.77초가 걸려, 정상 반복 요청보다 약 4배 느렸다. 안정 구간은 이 첫 요청을 제외한 값이다.
-
-### 핵심 A/B 계산
-
-```text
-응답시간 절감 = 1.441 - 0.5207
-              = 0.9203초/요청
-
-개선율 = (1.441 - 0.5207) / 1.441 × 100
-       = 63.87%
-
-속도 배수 = 1.441 / 0.5207
-          = 2.77배
-
-30회 누적 절감 = 43.23 - 15.62
-               = 27.61초
-```
-
-LMCache ON 실행 내부에서도 초기화 요청을 제외한 Cold 평균 1.304초와 Warm 평균 0.521초를 비교하면 **60.1% 감소, 2.50배 향상**이다. 독립적인 OFF 실행과의 비교뿐 아니라 같은 프로세스 안의 Cold/Warm 비교에서도 효과가 일관되게 나타났다.
-
-## 5. LMCache 동작 근거
-
-LMCache 서버 로그의 Cold 구간에는 다음 형태의 저장 기록이 30회 존재한다.
-
-```text
-LMCache INFO: Stored 512 tokens in 0.017 seconds
-```
-
-Warm 구간에는 다음 형태의 조회 기록이 30회 존재한다.
-
-```text
-LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2)
-LMCache INFO: Retrieved 512 tokens in 0.005 seconds
-```
-
-| LMCache 작업 | 횟수 | 평균 | 중앙값 | 최소 | 최대 | 합계 |
-|---|---:|---:|---:|---:|---:|---:|
-| 512 tokens 저장 | 30 | 0.0584초 | 0.0175초 | 0.012초 | 0.287초 | 1.751초 |
-| 512 tokens 조회 | 30 | 0.0053초 | 0.0050초 | 0.004초 | 0.011초 | 0.160초 |
-
-조회는 저장보다 평균 약 **10.94배 빠르다**. 입력 706 tokens 중 로그상 512 tokens를 복원했으므로, 요청 단위의 단순 비율은 다음과 같다.
-
-```text
-512 / 706 × 100 = 72.5%
-```
-
-이는 프롬프트 전체가 아니라 캐시 블록 경계에 맞는 512 tokens가 재사용됐음을 뜻한다. 나머지 토큰과 decode 16 tokens는 계속 처리해야 하므로, 응답시간이 72.5%가 아니라 63.9% 감소한 것은 자연스럽다.
-
-## 6. vLLM 로그 교차 검증
-
-LMCache ON 로그에는 vLLM 자체 prefix cache가 0.0%인 동시에 external cache 지표가 나타난다.
-
-```text
-Prefix cache hit rate: 0.0%, External prefix cache hit rate: 61.7%
-...
-Prefix cache hit rate: 0.0%, External prefix cache hit rate: 44.5%
-```
-
-반면 LMCache OFF 로그에는 모든 측정 구간에서 다음 항목만 있고 `External prefix cache hit rate`는 없다.
-
-```text
-Prefix cache hit rate: 0.0%
-```
-
-따라서 성능 향상이 vLLM 내장 prefix caching 때문이 아니라 LMCache external KV cache 경로에서 발생했다는 근거가 된다. ON 로그의 external hit rate는 Cold와 Warm 요청이 섞인 누적/구간 지표이므로, 개별 Warm 요청의 `512 / 706`과 숫자가 정확히 같을 필요는 없다.
-
-vLLM의 `Avg prompt throughput`은 10초 단위 구간값이며 요청 도착 시점과 Cold/Warm이 섞여 있다. 그러므로 본 보고서의 핵심 A/B 지표로는 요청별 end-to-end 시간과 LMCache의 실제 Store/Retrieve 기록을 사용했다.
-
-## 7. 해석 및 한계
-
-이번 로그로 확인되는 결론은 명확하다. **동일 프롬프트가 반복되는 단일 요청 환경에서는 LMCache Warm hit이 평균 응답시간을 약 64% 줄였다.** 또한 모든 요청이 HTTP 200으로 완료돼 성능 개선 과정에서 요청 실패가 관찰되지 않았다.
-
-다만 다음 한계가 있다.
-
-- 측정값은 0.01초 단위로 출력되어 세밀한 백분위수 분석에는 한계가 있다.
-- 두 조건은 서로 다른 시간대와 서버 프로세스에서 실행됐으므로 완전히 동일한 시스템 부하가 보장되지는 않는다.
-- 첫 요청에는 약 5.5초의 초기화 비용이 포함돼 일반 요청 성능과 분리해야 한다.
-- 순차 요청, 706-token 입력, 16-token 출력, 단일 모델 결과이므로 동시성·긴 출력·다른 모델로 일반화할 때 추가 측정이 필요하다.
-- LMCache의 장점은 반복 가능한 prefix가 있을 때 발생한다. 매번 완전히 새로운 프롬프트라면 저장 비용만 추가될 수 있다.
-
-## 8. 최종 판단
-
-| 평가 항목 | 판단 |
-|---|---|
-| LMCache 연결 여부 | ON 로그에서 external hit 지표와 Store/Retrieve 기록으로 확인 |
-| 캐시 미사용 기준선 | OFF 로그에 external hit 항목이 없고 두 번째 구간도 약 1.44초 유지 |
-| Warm 성능 개선 | 평균 1.441초 → 0.521초 |
-| 개선 효과 | 63.9% 지연 감소, 2.77배 속도 |
-| 안정성 | ON/OFF 각각 60개 요청 모두 HTTP 200 |
-| 적용 가치 | 반복 prefix가 많은 워크로드에서 유의미함 |
-
-따라서 현재 실습 구성에서는 **LMCache 사용이 효과적**이다. 특히 시스템 프롬프트, 긴 문서 문맥, 공통 대화 이력처럼 동일 prefix를 반복하는 서비스에서 이 결과와 유사한 prefill 절감 효과를 기대할 수 있다.
-
-```
-
-
+| 항목                |         결과 |
+| ----------------- | ---------: |
+| LMCache OFF       | **1.441초** |
+| LMCache ON + Warm | **0.521초** |
+| 응답시간 감소           | **0.920초** |
+| 개선율               |  **63.9%** |
+| 처리 속도             |  **2.77배** |
+| 30회 누적 절감         | **27.61초** |
 
 
 Reference
+- https://github.com/orca3/llm-model-inference/blob/main/ch07/LMCache.ipynb
 - https://blog.lmcache.ai/en/2026/06/23/vllm-lmcache-a-starter-guide-no-gpu-required
 - https://blog.lmcache.ai/en/2026/06/15/understanding-lmcache-mp-mode-transfer-paths-a-beginners-guide/
-- https://github.com/orca3/llm-model-inference/blob/main/ch07/LMCache.ipynb

@@ -261,7 +261,7 @@ vllm에서 lm cache 연결 설정
 - LMCacheMPConnector : LMCache 연결 설정
 - kv_both : vllm이 kv cache를 lm cahe를 통해 저장 및 조회하도록 설정
 - kv_connector_module_path.lmcache.integration.vllm.lmcache_mp_connector : kv 캐시를 저장 및 조회하는 양쪽 역할 모두 수행
-- kv_connector_extra_config.lmcache.mp.host : LMCache의 LMCacheMPConnector Python 모듈을 사용합니다. localhost:5555
+- kv_connector_extra_config.lmcache.mp.host : LMCache의 LMCacheMPConnector Python 모듈을 사용. localhost:5555
 - lmcache.mp.mp_transfer_mode : LMCache가 KV Cache 전송을 주도하는 방식
 
 ```python
@@ -351,7 +351,7 @@ round 2 200 0.33s {'prompt_tokens': 641, 'total_tokens': 649, 'completion_tokens
 ### 6. vllm이 LM Cache 사용한 경우와 사용하지 않은 경우 비교 
 
 
-1번 항목이 vllm이 LM CACHE를 사용하지 않고 실행, 2번 항목이 vllm이 LM CAHE를 활용하여 실행한 경우이다.
+1번 항목이 vllm이 LM CACHE를 사용하지 않고 실행, 2번 항목이 vllm이 LM CAHE를 활용하여 실행한 경우이다.  
 3번 항목은 별도의 터미널에서 LM Cache를 실행한다.
 
 ```bash
@@ -394,7 +394,7 @@ vllm serve facebook/opt-125m \
 
 ### 6.1 LM Cache 비활성화 로그
 
-chatgpt
+chatgpt  
 LMCache를 사용하지 않는 Baseline 환경으로 vLLM을 CPU에서 실행했으며, Prefix Caching은 비활성화하고 Triton/oneDNN 최적화 없이 V1 Model Runner와 PyTorch 연산으로 정상 기동한 상태이다.
 
 <details>
@@ -470,7 +470,7 @@ Loading pt checkpoint shards: 100% Completed | 1/1 [00:01<00:00,  1.62s/it]
 
 ### 6.2 LM Cache 활성화 로그
 
-chatgpt
+chatgpt  
 현재 vLLM은 GPU가 아닌 CPU 모드로 정상 기동했고, Triton은 GPU backend가 없어 비활성화되어 V1 Model Runner로 fallback됐다. LMCache는 CPU KV Cache를 대상으로 정상 초기화되었으며, 12개 layer × 227 blocks의 BF16 KV Cache 약 1 GiB를 Shared Memory에 backing storage로 구성했다.
 
 <details>

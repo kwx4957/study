@@ -1,11 +1,30 @@
 ## LLM Serving 스터디 4주차
 
+### 목차
 
+- [1.환경 설정](#1-환경-설정)
+- [2. vLLM 및 LM Cache 설치](2-vLLM-및-LM-Cache-설치)
+- [3. LM Cache 동작 테스트](#3-lm-cache-동작-테스트)
+- [4. LM Cache 실행 및 벤치](#4-lm-cache-실행-및-벤치)
+  - [4.1 LM Cache bench bench test](#41-lm-cache-bench-bench-test)
+- [5.](#5)
+- [6. vllm이 LM Cache 사용한 경우와 사용하지 않은 경우 비교](#6-vllm이-lm-cache-사용한-경우와-사용하지-않은-경우-비교)
+  - [6.1 LM Cache 비활성화 로그](#61-lm-cache-비활성화-로그)
+  - [6.2 LM Cache 활성화 로그](#62-lm-cache-활성화-로그)
+- [7. vllm 요청 테스트](#7-vllm-요청-테스트)
+  - [7.1 LM Cache 비활성화](#71-lm-cache-비활성화)
+  - [7.2 LM Cache 활성화](#72-lm-cache-활성화)
+  - [7.3 결과 정리](#73-결과-정리)
+- [8. python 요청 변경](#8-python-요청-변경)
+  - [8.1 LM Cache 비활성화](#81-lm-cache-비활성화)
+  - [8.2 LM Cache 활성화](#82-lm-cache-활성화)
+  - [8.3 결과 정리](#83-결과-정리)
 
 ### 1. 환경 설정
 
 - python3.12
 - WSL(Rocky9)
+- facebook/opt-125m
 
 ```sh
 mkdir -p ~/projects-test
@@ -21,7 +40,8 @@ git clone https://github.com/LMCache/LMCache.git
 ```
 
 ### 2. vLLM 및 LM Cache 설치
-가이드라인에서 권장하는 방식인 소스코드를 직접 빌드하려고 하였으나 너무 오랜 시간이 걸리고 지속적으로 패키지 누락으로 인한 빌드 실패로 인해 CI를 활용하여 설치를 진행했다.
+
+가이드라인에서 권장하는 방식인 소스코드를 직접 빌드하려고 하였으나 너무 오랜 시간이 걸리고 지속적으로 OS 의존성(패키지) 누락으로 인한 빌드 실패로 인해 CI를 활용하여 설치를 진행했다.
 
 ```sh
 # Official doc:
@@ -49,34 +69,38 @@ NO_GPU_EXT=1 pip install --no-build-isolation -e ~/projects-test/LMCache
 ```
 
 
-### 3. 
+### 3. LM Cache 동작 테스트
+
+LM Cache `0.5.5.dev36` 버전과 LM Cache가 cpu를 사용하게끔 설정된 것을 확인할수 있다.
 
 ```sh
 python -c 'import lmcache; print(lmcache.__version__)'
-
-# 
+#
 LMCache INFO: torch_dev=StubCPUDevice(device_type=cpu), torch_device_type=cpu (_device_detect.py:312:lmcache.v1.platform._device_detect)
 0.5.5.dev36
 
 python -c \
   'from lmcache.integration.vllm.lmcache_mp_connector \
    import LMCacheMPConnector; print("connector OK")'
-
-#  
+#
 LMCache INFO: torch_dev=StubCPUDevice(device_type=cpu), torch_device_type=cpu (_device_detect.py:312:lmcache.v1.platform._device_detect)
 Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
 Triton is installed, but doesn't include CPU backend. Disabling Triton.
 Triton not installed or not compatible; certain GPU-related functions will not be available.
 LMCache INFO: multi_layer_block_kv_transfer mode: tensor (base.py:95:lmcache.v1.multiprocess.transfer_context.base)
-
 connector OK
 ```
 
-### 4. 
+### 4. LM Cache 실행 및 벤치
+
+이 챕터에서는 LM Cache가 동작하는지 검증과 LM Cache 설정 그리고 간단한 벤치를 수행한다. 벤치의 경우 `512 token`으로 3회 수행한다.
+
+LM Cache 옵션
+- --l1-size-gb 1 : L1 kv ccahe 용량을 최대 1GB 설정한다
+- eviction-policy LR : kv cache가 꽉 차면 LRU 알고리즘으로 오래 사용되지 않은 캐시를 제거한다
+
 ```python
 # Step 1: start LMCache server (background)
-source ~/projects-test/.venv-lmcache/bin/activate
-
 lmcache server \
   --port 5555 \
   --http-port 8080 \
@@ -111,187 +135,116 @@ lmcache bench server \
 kill %1
 ```
 
-### 4.1 output
-- lmcache server test 1
-    
-    ```python
-    echo 'Server ready'
-    [2026-08-27 18:14:23,735] LMCache INFO: torch_dev=StubCPUDevice(device_type=cpu), torch_device_type=cpu (_device_detect.py:312:lmcache.v1.platform._device_detect)
-    
-     _     __  __    ____           _
-    | |   |  \/  |  / ___|__ _  ___| |__   ___      LMCache v0.5.5.dev36 (g4133a277)
-    | |   | |\/| | | |   / _` |/ __| '_ \ / _ \     Website:  https://lmcache.ai/
-    | |___| |  | | | |__| (_| | (__| | | |  __/     Recipes:  https://docs.lmcache.ai/recipes
-    |_____|_|  |_|  \____\__,_|\___|_| |_|\___|     LinkedIn: https://www.linkedin.com/company/lmcache-lab
-    Set LMCACHE_DISABLE_BANNER=1 to hide this banner.
-    
-    [2026-08-27 18:14:32,291] LMCache INFO: multi_layer_block_kv_transfer mode: tensor (base.py:95:lmcache.v1.multiprocess.transfer_context.base)
-    [2026-08-27 18:15:22,268] LMCache INFO: Discovered API module: cache_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,367] LMCache INFO: Discovered API module: env_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,381] LMCache INFO: Discovered API module: loglevel_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,392] LMCache INFO: Discovered API module: metrics_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,406] LMCache INFO: Discovered API module: periodic_thread_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,418] LMCache INFO: Discovered API module: run_script_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,430] LMCache INFO: Discovered API module: thread_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,432] LMCache INFO: Discovered API module: common_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,444] LMCache INFO: Discovered API module: config_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,483] LMCache INFO: Discovered API module: info_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,497] LMCache INFO: Discovered API module: quota_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,513] LMCache INFO: Discovered API module: reconfigure_api (router_discovery.py:53:lmcache.v1.utils.router_discovery)
-    [2026-08-27 18:15:22,534] LMCache WARNING: LazyMemoryAllocator requires memory pinning which is not supported on the current backend. Disabling l1-use-lazy. (config.py:156:lmcache.v1.distributed.config)
-    [2026-08-27 18:15:22,535] LMCache INFO: Starting LMCache HTTP server on http://0.0.0.0:8080 (http_server.py:259:lmcache.v1.multiprocess.http_server)
-    INFO:     Started server process [62203]
-    INFO:     Waiting for application startup.
-    [2026-08-27 18:15:23,454] LMCache INFO: Starting LMCache HTTP server... (accelerator available: False) (http_server.py:77:lmcache.v1.multiprocess.http_server)
-    [2026-08-27 18:15:23,491] LMCache INFO: OTel MeterProvider initialised with Prometheus fallback (standalone metrics HTTP server disabled; /metrics must be exposed by the caller), resource={'telemetry.sdk.language': 'python', 'telemetry.sdk.name': 'opentelemetry', 'telemetry.sdk.version': '1.40.0', 'service.instance.id': '7791bf2b-9612-4f2f-8709-f008312b10ac', 'service.name': 'unknown_service'} (otel_init.py:114:lmcache.v1.mp_observability.otel_init)
-    [2026-08-27 18:15:23,873] LMCache INFO: Starting L1EvictionController... (eviction_controller.py:53:lmcache.v1.distributed.storage_controllers.eviction_controller)
-    [2026-08-27 18:15:23,874] LMCache INFO: Starting L2EvictionController... (eviction_controller.py:250:lmcache.v1.distributed.storage_controllers.eviction_controller)
-    [2026-08-27 18:15:23,875] LMCache INFO: Starting StoreController... (store_controller.py:305:lmcache.v1.distributed.storage_controllers.store_controller)
-    [2026-08-27 18:15:23,875] LMCache INFO: Starting PrefetchController... (prefetch_controller.py:596:lmcache.v1.distributed.storage_controllers.prefetch_controller)
-    [2026-08-27 18:15:23,875] LMCache INFO: Using blake3 hash function (token_hasher.py:79:lmcache.v1.multiprocess.token_hasher)
-    [2026-08-27 18:15:23,978] LMCache INFO: Computed NONE_HASH=b"~>\xff\x9e\xf7a:P4\x0e\xb1&w\xee\x03\xb8:\xc7Y\xfc\xba\x9b\xb3'\x05\xf0rH\xd5mG;" using hash function (token_hasher.py:180:lmcache.v1.multiprocess.token_hasher)
-    [2026-08-27 18:15:23,979] LMCache INFO: TokenHasher initialized: chunk_size=256, hash_algorithm=blake3 (token_hasher.py:67:lmcache.v1.multiprocess.token_hasher)
-    [2026-08-27 18:15:23,979] LMCache INFO: PeriodicThread SessionManager-cleanup-thread-7f1bfa0ac0b0 entering main loop (interval=60.0s) (periodic_thread.py:304:lmcache.v1.periodic_thread)
-    [2026-08-27 18:15:23,979] LMCache INFO: Started PeriodicThread: SessionManager-cleanup-thread-7f1bfa0ac0b0 (level=medium, interval=60.0s, init_wait=0.0s) (periodic_thread.py:248:lmcache.v1.periodic_thread)
-    [2026-08-27 18:15:23,980] LMCache INFO: PeriodicThread DeviceHostFuncDispatcher entering main loop (interval=0.0s) (periodic_thread.py:304:lmcache.v1.periodic_thread)
-    [2026-08-27 18:15:23,980] LMCache INFO: Started PeriodicThread: DeviceHostFuncDispatcher (level=high, interval=0.0s, init_wait=0.0s) (periodic_thread.py:248:lmcache.v1.periodic_thread)
-    [2026-08-27 18:15:23,980] LMCache INFO: Supported transfer mode: lmcache_driven (server.py:219:lmcache.v1.multiprocess.server)
-    [2026-08-27 18:15:23,980] LMCache INFO: PeriodicThread lmcache-mp-worker-reaper entering main loop (interval=30.0s) (periodic_thread.py:304:lmcache.v1.periodic_thread)
-    [2026-08-27 18:15:23,980] LMCache INFO: Started PeriodicThread: lmcache-mp-worker-reaper (level=medium, interval=30.0s, init_wait=0.0s) (periodic_thread.py:248:lmcache.v1.periodic_thread)
-    [2026-08-27 18:15:23,981] LMCache INFO: Initializing MP usage context. (mp.py:93:lmcache.usage_telemetry.mp)
-    [2026-08-27 18:15:23,982] LMCache INFO: Initializing MP continuous usage reporting. (mp_continuous.py:217:lmcache.usage_telemetry.mp_continuous)
-    [2026-08-27 18:15:23,982] LMCache INFO: Started PeriodicThread: lmcache-usage-continuous (level=low, interval=600.0s, init_wait=600.0s) (periodic_thread.py:248:lmcache.v1.periodic_thread)
-    [2026-08-27 18:15:23,982] LMCache INFO: Initializing L2 connector usage reporting. (l2_usage.py:243:lmcache.usage_telemetry.l2_usage)
-    [2026-08-27 18:15:23,982] LMCache INFO: Started PeriodicThread: lmcache-usage-l2 (level=low, interval=600.0s, init_wait=600.0s) (periodic_thread.py:248:lmcache.v1.periodic_thread)
-    [2026-08-27 18:15:23,983] LMCache INFO: Initializing L1 usage reporting. (l1_usage.py:154:lmcache.usage_telemetry.l1_usage)
-    [2026-08-27 18:15:23,983] LMCache INFO: Started PeriodicThread: lmcache-usage-l1 (level=low, interval=600.0s, init_wait=600.0s) (periodic_thread.py:248:lmcache.v1.periodic_thread)
-    [2026-08-27 18:15:24,108] LMCache INFO: Created AffinityThreadPool 'affinity-pool-0' with 1 worker slots: up to 1 distinct affinity keys each bind to their own thread before slots are shared. Compare this against the number of clients expected to connect to confirm routing. (affinity_pool.py:60:lmcache.v1.multiprocess.affinity_pool)
-    [2026-08-27 18:15:24,108] LMCache INFO: LMCache ZMQ cache server is running on tcp://localhost:5555 (server.py:454:lmcache.v1.multiprocess.server)
-    [2026-08-27 18:15:24,109] LMCache INFO: LMCache cache server is running... (server.py:469:lmcache.v1.multiprocess.server)
-    [2026-08-27 18:15:24,110] LMCache INFO: LMCache HTTP server initialized (http_server.py:164:lmcache.v1.multiprocess.http_server)
-    INFO:     Application startup complete.
-    INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
-    INFO:     127.0.0.1:33946 - "GET /healthcheck HTTP/1.1" 200 OK
-    ```
-- lmcaeh bench test 2
-    
-    ```python
-    [2026-08-27 18:16:11,653] LMCache INFO: torch_dev=StubCPUDevice(device_type=cpu), torch_device_type=cpu (_device_detect.py:312:lmcache.v1.platform._device_detect)
-    
-     _     __  __    ____           _
-    | |   |  \/  |  / ___|__ _  ___| |__   ___      LMCache v0.5.5.dev36 (g4133a277)
-    | |   | |\/| | | |   / _` |/ __| '_ \ / _ \     Website:  https://lmcache.ai/
-    | |___| |  | | | |__| (_| | (__| | | |  __/     Recipes:  https://docs.lmcache.ai/recipes
-    |_____|_|  |_|  \____\__,_|\___|_| |_|\___|     LinkedIn: https://www.linkedin.com/company/lmcache-lab
-    Set LMCACHE_DISABLE_BANNER=1 to hide this banner.
-    
-    [2026-08-27 18:16:20,818] LMCache INFO: multi_layer_block_kv_transfer mode: tensor (base.py:95:lmcache.v1.multiprocess.transfer_context.base)
-      [info] --transfer-mode=lmcache_driven on cpu mode: using REGISTER_KV_CACHE + STORE/RETRIEVE over POSIX SHM
-    Connecting to LMCache MP Server at tcp://127.0.0.1:5555 (mode=cpu) ...
-    Server chunk_size = 256
-    Resolved KV shape spec: (2,1024,16,8,128):float16:32
-    Each request: 513 tokens (2 full chunks)
-    KV shape: 32 layers, 8 heads x 128, dtype=float16, blocks=1024x16, kv=2
-    [rank 0] Allocated 32 CPU SHM tensors (prefix=/lmcache_kv_62532_r0)
-    [2026-08-27 18:17:03,010] LMCache INFO: Engine KV Format: EngineKVFormat.NL_X_TWO_NB_NH_BS_HS NL x [2, NB, NH, BS, HS] (detection.py:69:lmcache.v1.gpu_connector.kv_format.detection)
-    [2026-08-27 18:17:03,010] LMCache INFO: Engine KV Format: EngineKVFormat.NL_X_TWO_NB_NH_BS_HS NL x [2, NB, NH, BS, HS] (detection.py:69:lmcache.v1.gpu_connector.kv_format.detection)
-    [2026-08-27 18:17:03,010] LMCache INFO: Group 0 first-layer tensor: layer_idx=0 shape=(2, 1024, 16, 8, 128) stride=(16777216, 16384, 1024, 128, 1) is_contiguous=True dtype=torch.float16 device=cpu storage_offset=0 numel=33554432 storage_nbytes=67108864 padding_per_block=0 (utils.py:603:lmcache.v1.gpu_connector.utils)
-    [2026-08-27 18:17:03,010] LMCache INFO: group 0: compressed (tokens_per_block=16, slots_per_block=8) (kv_layer_groups.py:767:lmcache.v1.kv_layer_groups)
-    [2026-08-27 18:17:03,011] LMCache INFO: KV layer groups: ---
-    KernelGroupInfo(layers=32, indices=0-31, shape_desc=(kv=2, nl=32, nb=1024, bs=8, nh=16, hs=128, element_size=2, block_stride_elems=0), dtype=torch.float16, tokens_per_block=16, slots_per_block=8, engine_group_idx=0, sw_size_tokens=-1)
-    --- (kv_layer_groups.py:474:lmcache.v1.kv_layer_groups)
-    [2026-08-27 18:17:03,025] LMCache INFO: CPUCacheContext: 32 layers, 1024 blocks, dtype=torch.float16 (shm-backed) (cache_context.py:186:lmcache.v1.platform.cpu.cache_context)
-    [2026-08-27 18:17:03,025] LMCache INFO: Registered KV cache for GPU ID 1000 with 32 layers (lmcache_driven_transfer.py:1010:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-    [rank 0] REGISTER_KV_CACHE: OK
-    
-    === Request seq=0 ===
-      [seq 0/cold] LOOKUP: 0/2 chunks hit (1.6 ms)
-    [2026-08-27 18:17:03,028] LMCache INFO: AffinityThreadPool: affinity_key=-5391682848642878554 assigned to worker slot 0 of 1 (thread affinity-pool-0-0); 1 distinct key(s) now bound (affinity_pool.py:108:lmcache.v1.multiprocess.affinity_pool)
-    [2026-08-27 18:17:03,190] LMCache INFO: Stored 512 tokens in 0.163 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-      [seq 0/cold] STORE: stored (512 tokens, 163.9 ms, 1 writers)
-    INFO:     127.0.0.1:51086 - "POST /cache/checksums HTTP/1.1" 200 OK
-      [seq 0/cold] CHECKSUM: dc71eaa56d6cdfb5 (2 chunks)
-    [2026-08-27 18:17:03,869] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-0-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-      [seq 0/warm] LOOKUP: 2/2 chunks hit (1.9 ms)
-    [2026-08-27 18:17:03,964] LMCache INFO: Retrieved 512 tokens in 0.094 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-      [seq 0/warm] RETRIEVE: retrieved (512 tokens, 95.3 ms, 1 workers)
-    INFO:     127.0.0.1:51090 - "POST /cache/checksums HTTP/1.1" 200 OK
-      [seq 0/warm] CHECKSUM: dc71eaa56d6cdfb5 (2 chunks)
-      [seq 0] CHECKSUM MATCH OK
-    
-    === Request seq=1 ===
-      [seq 1/cold] LOOKUP: 0/2 chunks hit (1.5 ms)
-    [2026-08-27 18:17:04,674] LMCache INFO: Stored 512 tokens in 0.089 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-      [seq 1/cold] STORE: stored (512 tokens, 90.4 ms, 1 writers)
-    INFO:     127.0.0.1:51098 - "POST /cache/checksums HTTP/1.1" 200 OK
-      [seq 1/cold] CHECKSUM: deef9de748d32e88 (2 chunks)
-    [2026-08-27 18:17:05,276] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-1-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-      [seq 1/warm] LOOKUP: 2/2 chunks hit (2.2 ms)
-    [2026-08-27 18:17:05,314] LMCache INFO: Retrieved 512 tokens in 0.036 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-      [seq 1/warm] RETRIEVE: retrieved (512 tokens, 37.1 ms, 1 workers)
-    INFO:     127.0.0.1:51114 - "POST /cache/checksums HTTP/1.1" 200 OK
-      [seq 1/warm] CHECKSUM: deef9de748d32e88 (2 chunks)
-      [seq 1] CHECKSUM MATCH OK
-    
-    === Request seq=2 ===
-      [seq 2/cold] LOOKUP: 0/2 chunks hit (2.0 ms)
-    [2026-08-27 18:17:05,989] LMCache INFO: Stored 512 tokens in 0.075 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-      [seq 2/cold] STORE: stored (512 tokens, 76.5 ms, 1 writers)
-    INFO:     127.0.0.1:51120 - "POST /cache/checksums HTTP/1.1" 200 OK
-      [seq 2/cold] CHECKSUM: 6fecbf59cb3d3a2e (2 chunks)
-    [2026-08-27 18:17:06,587] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-2-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-      [seq 2/warm] LOOKUP: 2/2 chunks hit (2.1 ms)
-    [2026-08-27 18:17:06,620] LMCache INFO: Retrieved 512 tokens in 0.033 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-      [seq 2/warm] RETRIEVE: retrieved (512 tokens, 33.6 ms, 1 workers)
-    INFO:     127.0.0.1:51128 - "POST /cache/checksums HTTP/1.1" 200 OK
-      [seq 2/warm] CHECKSUM: 6fecbf59cb3d3a2e (2 chunks)
-      [seq 2] CHECKSUM MATCH OK
-    
-    [2026-08-27 18:17:07,218] LMCache INFO: Unregistered KV cache for GPU ID 1000 (lmcache_driven_transfer.py:1037:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-    [iid 1000] UNREGISTER_KV_CACHE: OK
-    ===================== Server Bench Result ======================
-    ------------------------ Configuration -------------------------
-    RPC URL:                                    tcp://127.0.0.1:5555
-    Mode:                                                        cpu
-    Transfer mode:                                    lmcache_driven
-    Tokens / request:                                            512
-    Interval (s):                                               0.50
-    --------------------------- Results ----------------------------
-    Total requests:                                                3
-    Checksum OK:                                                   3
-    Checksum FAIL:                                                 0
-    Pass rate (%):                                            100.00
-    ----------------------- Cold Lookup (ms) -----------------------
-    count:                                                         3
-    mean:                                                       1.73
-    min:                                                        1.53
-    max:                                                        2.04
-    p50:                                                        1.62
-    p99:                                                        2.04
-    ----------------------- Cold Store (ms) ------------------------
-    count:                                                         3
-    mean:                                                     110.25
-    min:                                                       76.48
-    max:                                                      163.86
-    p50:                                                       90.40
-    p99:                                                      163.86
-    ----------------------- Warm Lookup (ms) -----------------------
-    count:                                                         3
-    mean:                                                       2.07
-    min:                                                        1.85
-    max:                                                        2.24
-    p50:                                                        2.12
-    p99:                                                        2.24
-    ---------------------- Warm Retrieve (ms) ----------------------
-    count:                                                         3
-    mean:                                                      55.35
-    min:                                                       33.57
-    max:                                                       95.34
-    p50:                                                       37.15
-    p99:                                                       95.34
-    ================================================================
-    Done.
-    ```
+### 4.1 LM Cache bench bench test
+
+ ```python
+   [info] --transfer-mode=lmcache_driven on cpu mode: using REGISTER_KV_CACHE + STORE/RETRIEVE over POSIX SHM
+ Connecting to LMCache MP Server at tcp://127.0.0.1:5555 (mode=cpu) ...
+ Server chunk_size = 256
+ Resolved KV shape spec: (2,1024,16,8,128):float16:32
+ Each request: 513 tokens (2 full chunks)
+ KV shape: 32 layers, 8 heads x 128, dtype=float16, blocks=1024x16, kv=2
+
+ [rank 0] Allocated 32 CPU SHM tensors (prefix=/lmcache_kv_62532_r0)
+  LMCache INFO: Engine KV Format: EngineKVFormat.NL_X_TWO_NB_NH_BS_HS NL x [2, NB, NH, BS, HS] (detection.py:69:lmcache.v1.gpu_connector.kv_format.detection)
+  LMCache INFO: Engine KV Format: EngineKVFormat.NL_X_TWO_NB_NH_BS_HS NL x [2, NB, NH, BS, HS] (detection.py:69:lmcache.v1.gpu_connector.kv_format.detection)
+  LMCache INFO: Group 0 first-layer tensor: layer_idx=0 shape=(2, 1024, 16, 8, 128) stride=(16777216, 16384, 1024, 128, 1) is_contiguous=True dtype=torch.float16 device=cpu storage_offset=0 numel=33554432 storage_nbytes=67108864 padding_per_block=0 (utils.py:603:lmcache.v1.gpu_connector.utils)
+  LMCache INFO: group 0: compressed (tokens_per_block=16, slots_per_block=8) (kv_layer_groups.py:767:lmcache.v1.kv_layer_groups)
+  LMCache INFO: KV layer groups: ---
+ KernelGroupInfo(layers=32, indices=0-31, shape_desc=(kv=2, nl=32, nb=1024, bs=8, nh=16, hs=128, element_size=2, block_stride_elems=0), dtype=torch.float16, tokens_per_block=16, slots_per_block=8, engine_group_idx=0, sw_size_tokens=-1)
+ --- (kv_layer_groups.py:474:lmcache.v1.kv_layer_groups)
+  LMCache INFO: CPUCacheContext: 32 layers, 1024 blocks, dtype=torch.float16 (shm-backed) (cache_context.py:186:lmcache.v1.platform.cpu.cache_context)
+  LMCache INFO: Registered KV cache for GPU ID 1000 with 32 layers (lmcache_driven_transfer.py:1010:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+ [rank 0] REGISTER_KV_CACHE: OK
+ 
+ === Request seq=0 ===
+   [seq 0/cold] LOOKUP: 0/2 chunks hit (1.6 ms)
+  LMCache INFO: AffinityThreadPool: affinity_key=-5391682848642878554 assigned to worker slot 0 of 1 (thread affinity-pool-0-0); 1 distinct key(s) now bound (affinity_pool.py:108:lmcache.v1.multiprocess.affinity_pool)
+  LMCache INFO: Stored 512 tokens in 0.163 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+   [seq 0/cold] STORE: stored (512 tokens, 163.9 ms, 1 writers)
+ INFO:     127.0.0.1:51086 - "POST /cache/checksums HTTP/1.1" 200 OK
+   [seq 0/cold] CHECKSUM: dc71eaa56d6cdfb5 (2 chunks)
+  LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-0-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+   [seq 0/warm] LOOKUP: 2/2 chunks hit (1.9 ms)
+  LMCache INFO: Retrieved 512 tokens in 0.094 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+   [seq 0/warm] RETRIEVE: retrieved (512 tokens, 95.3 ms, 1 workers)
+ INFO:     127.0.0.1:51090 - "POST /cache/checksums HTTP/1.1" 200 OK
+   [seq 0/warm] CHECKSUM: dc71eaa56d6cdfb5 (2 chunks)
+   [seq 0] CHECKSUM MATCH OK
+ 
+ === Request seq=1 ===
+   [seq 1/cold] LOOKUP: 0/2 chunks hit (1.5 ms)
+  LMCache INFO: Stored 512 tokens in 0.089 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+   [seq 1/cold] STORE: stored (512 tokens, 90.4 ms, 1 writers)
+ INFO:     127.0.0.1:51098 - "POST /cache/checksums HTTP/1.1" 200 OK
+   [seq 1/cold] CHECKSUM: deef9de748d32e88 (2 chunks)
+  LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-1-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+   [seq 1/warm] LOOKUP: 2/2 chunks hit (2.2 ms)
+  LMCache INFO: Retrieved 512 tokens in 0.036 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+   [seq 1/warm] RETRIEVE: retrieved (512 tokens, 37.1 ms, 1 workers)
+ INFO:     127.0.0.1:51114 - "POST /cache/checksums HTTP/1.1" 200 OK
+   [seq 1/warm] CHECKSUM: deef9de748d32e88 (2 chunks)
+   [seq 1] CHECKSUM MATCH OK
+ 
+ === Request seq=2 ===
+   [seq 2/cold] LOOKUP: 0/2 chunks hit (2.0 ms)
+  LMCache INFO: Stored 512 tokens in 0.075 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+   [seq 2/cold] STORE: stored (512 tokens, 76.5 ms, 1 writers)
+ INFO:     127.0.0.1:51120 - "POST /cache/checksums HTTP/1.1" 200 OK
+   [seq 2/cold] CHECKSUM: 6fecbf59cb3d3a2e (2 chunks)
+  LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=req-2-warm, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+   [seq 2/warm] LOOKUP: 2/2 chunks hit (2.1 ms)
+  LMCache INFO: Retrieved 512 tokens in 0.033 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+   [seq 2/warm] RETRIEVE: retrieved (512 tokens, 33.6 ms, 1 workers)
+ INFO:     127.0.0.1:51128 - "POST /cache/checksums HTTP/1.1" 200 OK
+   [seq 2/warm] CHECKSUM: 6fecbf59cb3d3a2e (2 chunks)
+   [seq 2] CHECKSUM MATCH OK
+ 
+  LMCache INFO: Unregistered KV cache for GPU ID 1000 (lmcache_driven_transfer.py:1037:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+ [iid 1000] UNREGISTER_KV_CACHE: OK
+ ===================== Server Bench Result ======================
+ ------------------------ Configuration -------------------------
+ RPC URL:                                    tcp://127.0.0.1:5555
+ Mode:                                                        cpu
+ Transfer mode:                                    lmcache_driven
+ Tokens / request:                                            512
+ Interval (s):                                               0.50
+ --------------------------- Results ----------------------------
+ Total requests:                                                3
+ Checksum OK:                                                   3
+ Checksum FAIL:                                                 0
+ Pass rate (%):                                            100.00
+ ----------------------- Cold Lookup (ms) -----------------------
+ count:                                                         3
+ mean:                                                       1.73
+ min:                                                        1.53
+ max:                                                        2.04
+ p50:                                                        1.62
+ p99:                                                        2.04
+ ----------------------- Cold Store (ms) ------------------------
+ count:                                                         3
+ mean:                                                     110.25
+ min:                                                       76.48
+ max:                                                      163.86
+ p50:                                                       90.40
+ p99:                                                      163.86
+ ----------------------- Warm Lookup (ms) -----------------------
+ count:                                                         3
+ mean:                                                       2.07
+ min:                                                        1.85
+ max:                                                        2.24
+ p50:                                                        2.12
+ p99:                                                        2.24
+ ---------------------- Warm Retrieve (ms) ----------------------
+ count:                                                         3
+ mean:                                                      55.35
+ min:                                                       33.57
+ max:                                                       95.34
+ p50:                                                       37.15
+ p99:                                                       95.34
+ ================================================================
+ Done.
+ ```
 
 ### 5. 
 
@@ -379,9 +332,12 @@ round 1 200 0.34s {'prompt_tokens': 641, 'total_tokens': 649, 'completion_tokens
 round 2 200 0.33s {'prompt_tokens': 641, 'total_tokens': 649, 'completion_tokens': 8, 'prompt_tokens_details': None, 'completion_tokens_details': None}
 ```
 
-### 6. VLLM이 LM Cache 사용한 경우와 사용하지 않은 경우 비교 
+### 6. vllm이 LM Cache 사용한 경우와 사용하지 않은 경우 비교 
+
 
 1번 항목이 vllm이 LM CACHE를 사용하지 않고 실행, 2번 항목이 vllm이 LM CAHE를 활용하여 실행한 경우이다.
+3번 항목은 별도의 터미널에서 LM Cache를 실행한다.
+
 ```bash
 # 1) 터미널 A: LM Cache 비활성화, vllm 실행
 vllm serve facebook/opt-125m \
@@ -659,8 +615,18 @@ Loading pt checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  3.71it/s]
 
 ### 7. vllm 요청 테스트 
 
-```bash
-# Terminal C: verify cache hit
+요청을 보내기 앞서, 주의할 점은 vllm을 종료하더라도 LM Cache가 실행중이라면 kv cache를 저장하고 있다. 이를 초기화하기 위해서는 LM Cacehe에 캐시를 초기화하는 요청을 보내야한다. 
+
+> curl -X POST http://localhost:8080/cache/clear
+> {"status":"ok","cleared":{"tier":"l1"}
+
+테스트 환경
+- prefix 캐싱 비활성화
+- 최대 토큰 2048
+- 최대 동시 처리 1개
+
+```sh
+# 터미널 C: verify cache hit
 source ~/projects-test/.venv-lmcache/bin/activate
 
 cat > /tmp/test_lmcache_e2e.py <<'EOF'
@@ -716,9 +682,7 @@ EOF
 python3.12 /tmp/test_lmcache_e2e.py
 ```
 
-### 9. 결과 비교
-
-### 9.1 LM Cache 비활성화
+### 7.1 LM Cache 비활성화
 ```sh
 # 1) curl 요청 결과. 총 20개 요청
 python3.12 /tmp/test_lmcache_e2e.py
@@ -738,7 +702,7 @@ Engine 000: Avg prompt throughput: 256.4 tokens/s, Avg generation throughput: 3.
 Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
 ```
 
-### 9.2 LM Cache 활성화
+### 7.2 LM Cache 활성화
 ```sh
 # 1) curl 요청 결과. 총 20개 요청
 round 1: 1.364s {'prompt_tokens': 641, 'total_tokens': 649, 'completion_tokens': 8, 'prompt_tokens_details': None, 'completion_tokens_details': None}
@@ -759,51 +723,264 @@ Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 
 
 # 3) LM Cache 로그
 LMCache INFO: AffinityThreadPool: affinity_key=7757079394529801316 assigned to worker slot 0 of 1 (thread affinity-pool-0-0); 1 distinct key(s) now bound (affinity_pool.py:108:lmcache.v1.multiprocess.affinity_pool)
+
+# 3-1) 첫 요청
 LMCache INFO: Stored 512 tokens in 0.134 seconds (lmcache_driven_transfer.py:1273:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.5 ms (external_request_id=cmpl-9d8932e27aeae1af-0-802d0cde, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
+LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.5 ms (external_request_id=cmpl-9d8932e27aeae1af-0-802d0cde, prefetch_request_id=-1)
+
+# 3-2) 2번 요청
 LMCache INFO: Retrieved 512 tokens in 0.009 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.6 ms (external_request_id=cmpl-84207609a329e1f8-0-99db0914, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-LMCache INFO: Retrieved 512 tokens in 0.007 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.8 ms (external_request_id=cmpl-ba94baa21484ae93-0-80161ec5, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-LMCache INFO: Retrieved 512 tokens in 0.004 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.5 ms (external_request_id=cmpl-986e34ac01466bba-0-97bbc6f7, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-LMCache INFO: Retrieved 512 tokens in 0.004 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.8 ms (external_request_id=cmpl-8e5b3857ef49b883-0-8ca29ccd, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-LMCache INFO: Retrieved 512 tokens in 0.004 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.5 ms (external_request_id=cmpl-8f26e11d10f318c1-0-b7f696bf, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:17,895] LMCache INFO: Retrieved 512 tokens in 0.004 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:18,195] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.6 ms (external_request_id=cmpl-b4c2498397649e9e-0-99bd7c6d, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:18,201] LMCache INFO: Retrieved 512 tokens in 0.004 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:18,510] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.4 ms (external_request_id=cmpl-aa859c1e4807d927-0-80416259, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:18,515] LMCache INFO: Retrieved 512 tokens in 0.004 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:18,810] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.5 ms (external_request_id=cmpl-b5a1ddce22bf8d64-0-8349f938, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:18,816] LMCache INFO: Retrieved 512 tokens in 0.005 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:19,112] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.8 ms (external_request_id=cmpl-a04b61cb187f46b3-0-8db88efd, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:19,123] LMCache INFO: Retrieved 512 tokens in 0.009 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:19,415] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.6 ms (external_request_id=cmpl-a29b1ab2c5a9cd57-0-8576bcfc, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:19,422] LMCache INFO: Retrieved 512 tokens in 0.006 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:19,719] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.7 ms (external_request_id=cmpl-a500cd99e3d95337-0-8db65d1b, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:19,725] LMCache INFO: Retrieved 512 tokens in 0.004 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:20,024] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.9 ms (external_request_id=cmpl-8d12948da2718c15-0-b759d22b, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:20,030] LMCache INFO: Retrieved 512 tokens in 0.005 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:20,329] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.5 ms (external_request_id=cmpl-bbe8305c6cb690d9-0-b67c7db4, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:20,338] LMCache INFO: Retrieved 512 tokens in 0.008 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:20,679] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.9 ms (external_request_id=cmpl-becec5ed604ee03f-0-8d4dc79b, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:20,685] LMCache INFO: Retrieved 512 tokens in 0.004 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:21,056] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.6 ms (external_request_id=cmpl-91aacfccbcd60f96-0-bc978360, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:21,065] LMCache INFO: Retrieved 512 tokens in 0.008 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:21,472] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 2.0 ms (external_request_id=cmpl-95c7ea3daae87a1b-0-bf75c760, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:21,483] LMCache INFO: Retrieved 512 tokens in 0.009 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
-[2026-08-28 17:09:21,848] LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.6 ms (external_request_id=cmpl-abcae9acf4f526d2-0-9e9c71a8, prefetch_request_id=-1) (storage_manager.py:726:lmcache.v1.distributed.storage_manager)
-[2026-08-28 17:09:21,855] LMCache INFO: Retrieved 512 tokens in 0.005 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.6 ms (external_request_id=cmpl-84207609a329e1f8-0-99db0914, prefetch_request_id=-1)
+
+# 3-3) 20번째 마지막 요청
+LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2) in 0.6 ms (external_request_id=cmpl-abcae9acf4f526d2-0-9e9c71a8, prefetch_request_id=-1)  
+LMCache INFO: Retrieved 512 tokens in 0.005 seconds (lmcache_driven_transfer.py:1515:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)
+```
+
+### 7.3 결과 정리
+LM Cache가 641개의 토큰 중 512개 토큰의 kv cache를 L1에 저장하여 활용중이다. 첫 저장은 `0.134s`가 걸린 이후 조회에는 `0.009s`로 상당한 성능차이가 있음을 알수 있다.
+
+| 지표         | LMCache 비활성화 | LMCache 활성화 |             개선 |
+| ---------- | -----------: | ----------: | -------------: |
+| 평균 응답시간    |       1.069s |  **0.365s** | **약 65.9% 감소** |
+| P50        |       1.071s |  **0.306s** | **약 71.4% 감소** |
+| 최소         |       1.049s |  **0.300s** | **약 71.4% 감소** |
+| 최대         |       1.098s |      1.104s |       초기 요청 영향 |
+| Prompt     |   641 tokens |  641 tokens |             동일 |
+| Completion |     8 tokens |    8 tokens |             동일 |
+
+
+
+### 8. python 요청 변경 
+
+```python
+from openai import OpenAI
+
+import argparse
+import contextlib
+import os
+import time
+from dataclasses import asdict
+
+#from lmcache.experimental.cache_engine import LMCacheEngineBuilder
+#from lmcache.integration.vllm.utils import ENGINE_NAME
+
+from vllm import LLM, SamplingParams
+from vllm.config import KVTransferConfig
+from vllm.engine.arg_utils import EngineArgs
+
+# Modify OpenAI's API key and API base to use vLLM's API server.
+model_id="facebook/opt-125m"
+openai_api_key = "EMPTY"
+openai_api_base = "http://localhost:18000/v1"
+client = OpenAI(
+    api_key=openai_api_key,
+    base_url=openai_api_base,
+)
+
+sampling_params = SamplingParams(temperature=0,
+                                 top_p=0.95,
+                                 max_tokens=10)
+
+def print_output_online(
+    client,
+    prompt: list[str],
+    sampling_params: SamplingParams,
+    req_str: str,
+):
+    # Should be able to see logs like the following:
+    # `LMCache INFO: Storing KV cache for 6006 out of 6006 tokens for request 0`
+    # This indicates that the KV cache has been stored in LMCache.
+    start = time.time()
+    completion = client.completions.create(model=model_id,
+                                              prompt=prompt)
+    print("Completion result:", completion)
+    print("-" * 50)
+    # for output in outputs:
+    #     generated_text = output.outputs[0].text
+    #     print(f"Generated text: {generated_text!r}")
+    time_elapsed = time.time() - start
+    print(f"Generation took {time_elapsed:.2f} seconds, "
+          f"{req_str} request done.")
+    print("-" * 50)
+    return time_elapsed
+
+time_cold_lmcache = []
+for i in range(30)[::-1]:
+    print('First time', i)
+    shared_prompt = f"Hello this is now a brand new prompt, how are you? {i}"
+    auto_prompt = shared_prompt*50+ "Hello, my name is"
+
+    time_cold_lmcache.append(print_output_online(client, auto_prompt, sampling_params, "auto"))
+
+time_warm_lmcache = []
+for i in range(30):
+    print('Second time', i)
+    shared_prompt = f"Hello this is now a brand new prompt, how are you? {i}"
+    auto_prompt = shared_prompt*50+ "Hello, my name is"
+
+    time_warm_lmcache.append(print_output_online(client, auto_prompt, sampling_params, "auto"))
+```
+
+### 8.1 LM Cache 비활성화
+
+
+### 8.2 LM Cache 활성화
+
+
+### 8.3 결과 정리
+
+## 1. 결론 요약
+
+동일한 706-token 프롬프트를 반복 요청한 로그를 비교한 결과, **LMCache가 활성화되고 캐시가 준비된 Warm 구간의 평균 응답시간은 0.521초**, LMCache 미사용의 대응 구간은 **1.441초**였다.
+
+- 평균 응답시간 감소: **0.920초/요청**
+- 지연시간 개선율: **63.9%**
+- 처리 속도 배수: **2.77배**
+- 30회 누적시간: **43.23초 → 15.62초** (총 **27.61초 절감**)
+
+LMCache 서버 로그에서도 Cold 구간에 30회 저장, Warm 구간에 30회 조회가 확인됐다. Warm 요청마다 512 tokens가 L1에서 복원됐으며, 조회 자체는 평균 0.0053초였다. 따라서 이번 실험에서는 LMCache가 긴 프롬프트의 prefill 계산 일부를 재사용해 응답시간을 크게 줄였다고 판단할 수 있다.
+
+## 2. 분석 대상
+
+| 파일 | 역할 | 확인 내용 |
+|---|---|---|
+| `Python_LM_Cache_active_output.md` | LMCache ON 클라이언트 로그 | Cold 30회, Warm 30회 응답시간 |
+| `Python_LM_Cache_deactive_output.md` | LMCache OFF 클라이언트 로그 | 동일 구성의 2개 구간, 총 60회 응답시간 |
+| `LM_Cache_output.md` | LMCache 서버 로그 | 512-token 저장 30회, 조회 30회 및 소요시간 |
+| `vllm_LM_Cache_active_output.md` | LMCache ON vLLM 로그 | HTTP 200 60회, external cache hit 지표 |
+| `vllm_LM_Cache_deactive_output.md` | LMCache OFF vLLM 로그 | HTTP 200 60회, external cache 지표 없음 |
+
+모든 Python 응답에서 모델은 `facebook/opt-125m`, 입력은 706 tokens, 출력은 16 tokens였다. 두 실행 모두 `/v1/completions` 요청 60회가 HTTP 200으로 완료됐다.
+
+## 3. 비교 방법
+
+Python 로그의 다음 값을 요청별 end-to-end 응답시간으로 사용했다.
+
+```text
+Generation took N.NN seconds, auto request done.
+```
+
+LMCache ON 실행은 첫 30회가 서로 다른 프롬프트를 처음 처리하는 Cold/Store 구간이고, 다음 30회가 같은 프롬프트를 다시 처리하는 Warm/Retrieve 구간이다. LMCache OFF 실행도 동일하게 두 번째 30회를 대응 구간으로 사용했다.
+
+계산식은 다음과 같다.
+
+```text
+평균 = 요청시간 합계 / 요청 수
+개선율(%) = (OFF 평균 - ON Warm 평균) / OFF 평균 × 100
+속도 배수 = OFF 평균 / ON Warm 평균
+```
+
+## 4. Python 응답시간 결과
+
+| 조건 | 요청 수 | 평균 | 중앙값 | 최소 | 최대 | 합계 |
+|---|---:|---:|---:|---:|---:|---:|
+| LMCache ON — Cold 전체 | 30 | 1.445초 | 1.300초 | 1.220초 | 5.520초 | 43.34초 |
+| LMCache ON — Cold 안정 구간¹ | 29 | 1.304초 | 1.300초 | 1.220초 | 1.400초 | 37.82초 |
+| **LMCache ON — Warm** | **30** | **0.521초** | **0.520초** | **0.500초** | **0.560초** | **15.62초** |
+| LMCache OFF — 1차 전체 | 30 | 1.498초 | 1.350초 | 1.210초 | 5.770초 | 44.95초 |
+| LMCache OFF — 1차 안정 구간¹ | 29 | 1.351초 | 1.350초 | 1.210초 | 1.500초 | 39.18초 |
+| **LMCache OFF — 2차** | **30** | **1.441초** | **1.415초** | **1.350초** | **1.600초** | **43.23초** |
+
+¹ 각 실행의 첫 요청은 서버/모델 초기화 영향으로 각각 5.52초와 5.77초가 걸려, 정상 반복 요청보다 약 4배 느렸다. 안정 구간은 이 첫 요청을 제외한 값이다.
+
+### 핵심 A/B 계산
+
+```text
+응답시간 절감 = 1.441 - 0.5207
+              = 0.9203초/요청
+
+개선율 = (1.441 - 0.5207) / 1.441 × 100
+       = 63.87%
+
+속도 배수 = 1.441 / 0.5207
+          = 2.77배
+
+30회 누적 절감 = 43.23 - 15.62
+               = 27.61초
+```
+
+LMCache ON 실행 내부에서도 초기화 요청을 제외한 Cold 평균 1.304초와 Warm 평균 0.521초를 비교하면 **60.1% 감소, 2.50배 향상**이다. 독립적인 OFF 실행과의 비교뿐 아니라 같은 프로세스 안의 Cold/Warm 비교에서도 효과가 일관되게 나타났다.
+
+## 5. LMCache 동작 근거
+
+LMCache 서버 로그의 Cold 구간에는 다음 형태의 저장 기록이 30회 존재한다.
+
+```text
+LMCache INFO: Stored 512 tokens in 0.017 seconds
+```
+
+Warm 구간에는 다음 형태의 조회 기록이 30회 존재한다.
+
+```text
+LMCache INFO: Prefetch request completed (L1+L2): 2/2 retained keys (2 L1, 0 L2)
+LMCache INFO: Retrieved 512 tokens in 0.005 seconds
+```
+
+| LMCache 작업 | 횟수 | 평균 | 중앙값 | 최소 | 최대 | 합계 |
+|---|---:|---:|---:|---:|---:|---:|
+| 512 tokens 저장 | 30 | 0.0584초 | 0.0175초 | 0.012초 | 0.287초 | 1.751초 |
+| 512 tokens 조회 | 30 | 0.0053초 | 0.0050초 | 0.004초 | 0.011초 | 0.160초 |
+
+조회는 저장보다 평균 약 **10.94배 빠르다**. 입력 706 tokens 중 로그상 512 tokens를 복원했으므로, 요청 단위의 단순 비율은 다음과 같다.
+
+```text
+512 / 706 × 100 = 72.5%
+```
+
+이는 프롬프트 전체가 아니라 캐시 블록 경계에 맞는 512 tokens가 재사용됐음을 뜻한다. 나머지 토큰과 decode 16 tokens는 계속 처리해야 하므로, 응답시간이 72.5%가 아니라 63.9% 감소한 것은 자연스럽다.
+
+## 6. vLLM 로그 교차 검증
+
+LMCache ON 로그에는 vLLM 자체 prefix cache가 0.0%인 동시에 external cache 지표가 나타난다.
+
+```text
+Prefix cache hit rate: 0.0%, External prefix cache hit rate: 61.7%
+...
+Prefix cache hit rate: 0.0%, External prefix cache hit rate: 44.5%
+```
+
+반면 LMCache OFF 로그에는 모든 측정 구간에서 다음 항목만 있고 `External prefix cache hit rate`는 없다.
+
+```text
+Prefix cache hit rate: 0.0%
+```
+
+따라서 성능 향상이 vLLM 내장 prefix caching 때문이 아니라 LMCache external KV cache 경로에서 발생했다는 근거가 된다. ON 로그의 external hit rate는 Cold와 Warm 요청이 섞인 누적/구간 지표이므로, 개별 Warm 요청의 `512 / 706`과 숫자가 정확히 같을 필요는 없다.
+
+vLLM의 `Avg prompt throughput`은 10초 단위 구간값이며 요청 도착 시점과 Cold/Warm이 섞여 있다. 그러므로 본 보고서의 핵심 A/B 지표로는 요청별 end-to-end 시간과 LMCache의 실제 Store/Retrieve 기록을 사용했다.
+
+## 7. 해석 및 한계
+
+이번 로그로 확인되는 결론은 명확하다. **동일 프롬프트가 반복되는 단일 요청 환경에서는 LMCache Warm hit이 평균 응답시간을 약 64% 줄였다.** 또한 모든 요청이 HTTP 200으로 완료돼 성능 개선 과정에서 요청 실패가 관찰되지 않았다.
+
+다만 다음 한계가 있다.
+
+- 측정값은 0.01초 단위로 출력되어 세밀한 백분위수 분석에는 한계가 있다.
+- 두 조건은 서로 다른 시간대와 서버 프로세스에서 실행됐으므로 완전히 동일한 시스템 부하가 보장되지는 않는다.
+- 첫 요청에는 약 5.5초의 초기화 비용이 포함돼 일반 요청 성능과 분리해야 한다.
+- 순차 요청, 706-token 입력, 16-token 출력, 단일 모델 결과이므로 동시성·긴 출력·다른 모델로 일반화할 때 추가 측정이 필요하다.
+- LMCache의 장점은 반복 가능한 prefix가 있을 때 발생한다. 매번 완전히 새로운 프롬프트라면 저장 비용만 추가될 수 있다.
+
+## 8. 최종 판단
+
+| 평가 항목 | 판단 |
+|---|---|
+| LMCache 연결 여부 | ON 로그에서 external hit 지표와 Store/Retrieve 기록으로 확인 |
+| 캐시 미사용 기준선 | OFF 로그에 external hit 항목이 없고 두 번째 구간도 약 1.44초 유지 |
+| Warm 성능 개선 | 평균 1.441초 → 0.521초 |
+| 개선 효과 | 63.9% 지연 감소, 2.77배 속도 |
+| 안정성 | ON/OFF 각각 60개 요청 모두 HTTP 200 |
+| 적용 가치 | 반복 prefix가 많은 워크로드에서 유의미함 |
+
+따라서 현재 실습 구성에서는 **LMCache 사용이 효과적**이다. 특히 시스템 프롬프트, 긴 문서 문맥, 공통 대화 이력처럼 동일 prefix를 반복하는 서비스에서 이 결과와 유사한 prefill 절감 효과를 기대할 수 있다.
+
 ```
 
 
+
+
 Reference
-- https://blog.lmcache.ai/en/2026/06/23/vllm-lmcache-a-starter-guide-no-gpu-required/#elementor-toc__heading-anchor-9
+- https://blog.lmcache.ai/en/2026/06/23/vllm-lmcache-a-starter-guide-no-gpu-required
 - https://blog.lmcache.ai/en/2026/06/15/understanding-lmcache-mp-mode-transfer-paths-a-beginners-guide/
 - https://github.com/orca3/llm-model-inference/blob/main/ch07/LMCache.ipynb
-
-
-
-

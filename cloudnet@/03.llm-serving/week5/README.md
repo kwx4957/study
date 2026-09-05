@@ -1,34 +1,16 @@
 ## LLM Serving 스터디 5주차 
-### 
-### 
-### 
-### 
-### 
-### 목차
-
-- [1.환경 설정](#1-환경-설정)
-- [2. vLLM 및 LM Cache 설치](2-vLLM-및-LM-Cache-설치)
-- [3. LM Cache 동작 테스트](#3-lm-cache-동작-테스트)
-- [4. LM Cache 실행 및 벤치](#4-lm-cache-실행-및-벤치)
-  - [4.1 LM Cache bench bench test](#41-lm-cache-bench-bench-test)
-- [5. LM Cache & vllm 실행](#5-lm-cache--vllm-실행)
-- [6. vllm이 LM Cache 사용한 경우와 사용하지 않은 경우 비교](#6-vllm이-lm-cache-사용한-경우와-사용하지-않은-경우-비교)
-  - [6.1 LM Cache 비활성화 로그](#61-lm-cache-비활성화-로그)
-  - [6.2 LM Cache 활성화 로그](#62-lm-cache-활성화-로그)
-- [7. vllm 요청 테스트](#7-vllm-요청-테스트)
-  - [7.1 LM Cache 비활성화](#71-lm-cache-비활성화)
-  - [7.2 LM Cache 활성화](#72-lm-cache-활성화)
-  - [7.3 결과 정리](#73-결과-정리)
-- [8. python 요청 변경](#8-python-요청-변경)
-  - [8.1 LM Cache 활성화](#81-lm-cache-활성화)
-  - [8.2 LM Cache 비활성화](#82-lm-cache-비활성화)
-  - [8.3 결과 정리](#83-결과-정리)
-
 
 ### 크롬 환경 설정
-chrome://chrome-urls/?host=chrome://tracing/#internal-debug-pages 접속하여 chrome://tracing 이 속해있는 항목이 활성화도어있는지 확인한다. 만일 안되었다면 활성화해전다.
+`chrome://chrome-urls/?host=chrome://tracing/#internal-debug-pages` 접속하여 `chrome://tracing` 이 속해있는 항목이 활성화되어있는지 확인한다. 기본 값은 비활성화이기 떄문에 이를 활성화후 `chrome://tracing/` 에 들어간다.
 
 <img width="304" height="614" alt="image" src="https://github.com/user-attachments/assets/9f314a85-ada9-4369-b752-3a059259cc66" />
 
+접속 후에는 colab 또는 pytorch 프로파일러에서 수행했던 결과물(trace.json)에 대해서 Load 버튼을 클릭하여 정보를 읽어들인다.
 
-chrome://tracing/
+<img width="881" height="801" alt="image" src="https://github.com/user-attachments/assets/829b08c3-b291-4bfa-bc9c-e0fb1194cd02" />
+
+Reference
+- https://huggingface.co/blog/torch-profiler 
+- https://tutorials.pytorch.kr/recipes/recipes/profiler_recipe.html
+- https://docs.nvidia.com/nsight-systems/InstallationGuide/index.html
+- https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html

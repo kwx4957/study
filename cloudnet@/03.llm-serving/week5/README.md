@@ -23,3 +23,12 @@
   - [8.1 LM Cache 활성화](#81-lm-cache-활성화)
   - [8.2 LM Cache 비활성화](#82-lm-cache-비활성화)
   - [8.3 결과 정리](#83-결과-정리)
+
+
+### 크롬 환경 설정
+chrome://chrome-urls/?host=chrome://tracing/#internal-debug-pages 접속하여 chrome://tracing 이 속해있는 항목이 활성화도어있는지 확인한다. 만일 안되었다면 활성화해전다.
+
+<img width="304" height="614" alt="image" src="https://github.com/user-attachments/assets/9f314a85-ada9-4369-b752-3a059259cc66" />
+
+
+chrome://tracing/

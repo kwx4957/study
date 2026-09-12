@@ -5,15 +5,13 @@
 ### 목차 
 
 - [1. VM 생성을 위한 GCP VM 설정](#VM-생성을-위한-GCP-설정)
-- [2. VM GPU 설정](VM-GPU-설정)
+- [2. VM GPU 설정](#vm-gpu-설정)
 - [3. GPU Docekr](#GPU-Docekr)
-- [4. LM Cache 실행 및 벤치](#4-lm-cache-실행-및-벤치)
-  - [4.1 LM Cache bench bench test](#41-lm-cache-bench-bench-test)
-- [5. LM Cache & vllm 실행](#5-lm-cache--vllm-실행)
-- [6. vllm이 LM Cache 사용한 경우와 사용하지 않은 경우 비교](#6-vllm이-lm-cache-사용한-경우와-사용하지-않은-경우-비교)
-  - [6.1 LM Cache 비활성화 로그](#61-lm-cache-비활성화-로그)
-  - [6.2 LM Cache 활성화 로그](#62-lm-cache-활성화-로그)
-- [7. vllm 요청 테스트](#7-vllm-요청-테스트)
+- [4. k3s 설치](#k3s-설치)
+- [5. kube-promethues-stack 설치](#kube-promethues-stack)
+- [6. DCGM Exporter 설치](#DCGM-Exporter)
+- [7. Nvdia GPU Operator](#Nvdia-GPU-Operator)
+- [8. vllm 배포](#vllm-배포)
 
 
 ### VM 생성을 위한 GCP 설정
@@ -139,6 +137,10 @@ gcloud compute disks delete <DISK_NAME> \
 
 
 ### VM GPU 설정
+
+pciutils, EPEL, CRB, kernel headers/devel, NVIDIA CUDA repo를 구성 및 nvidia-open, cuda-drivers를 설치한다  
+nvidia-smi, dkms status, lsmod, /dev/nvidia*, libcuda.so 등을 확인해 GPU를 정상적으로 인식하는지 확인한다.  
+
 ```sh
 # lspci 설치
 sudo dnf install -y pciutils
@@ -147,7 +149,7 @@ sudo dnf install -y pciutils
 lspci | grep -i nvidia
 00:04.0 3D controller: NVIDIA Corporation TU104GL [Tesla T4] (rev a1)
 
-# 패키지 설치
+# GPU 관련 패키지 설치
 sudo dnf install epel-release -y
 sudo dnf config-manager --enable crb
 sudo dnf groupinstall "Development Tools" -y
@@ -353,6 +355,10 @@ sudo modprobe nvidia
 
 
 ### GPU Docekr 
+
+Docker 설치 이후 `nvidia-container-toolkit`을 추가한다.
+nvidia-ctk runtime configure --runtime=docker로 Docker 런타임을 NVIDIA GPU 사용 가능 상태로 만들고, 컨테이너 내부에서 GPU가 보이는지 검증한다.
+
 ```sh
 sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
 sudo dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
@@ -407,7 +413,6 @@ Fri Sep 11 05:17:32 2026
 | N/A   40C    P8              9W /   70W |       0MiB /  15360MiB |      0%      Default |
 |                                         |                        |                  N/A |
 +-----------------------------------------+------------------------+----------------------+
-
 +-----------------------------------------------------------------------------------------+
 | Processes:                                                                              |
 |  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
@@ -429,7 +434,6 @@ build flags: -D_GNU_SOURCE -D_FORTIFY_SOURCE=2 -DNDEBUG -std=gnu11 -O2 -g -fdata
 nvidia-ctk --version
 NVIDIA Container Toolkit CLI version 1.20.0
 commit: 5505e2f94d9aaa08561490db974ba3cd676af20
-
 
 cat /etc/nvidia-container-runtime/config.toml
 #accept-nvidia-visible-devices-as-volume-mounts = false
@@ -1156,7 +1160,6 @@ lrwxrwxrwx+     1 root root        20 Sep 11 05:22 /usr/lib64/libcuda.so.1 -> li
 lrwxrwxrwx+     1 root root        28 Sep 11 05:22 /usr/lib64/libcudadebugger.so.1 -> libcudadebugger.so.615.71.09
 -rwxr-xr-x+     1 root root  12198904 Sep  4 21:25 /usr/lib64/libcudadebugger.so.615.71.09
 
-
 ls -l /usr/lib/x86_64-linux-gnu/libnvidia*
 lrwxrwxrwx+                                           1 root root        32 Sep 11 05:22 /usr/lib64/libnvidia-allocator.so.1 -> libnvidia-allocator.so.615.71.09
 -rwxr-xr-x+                                           1 root root    152904 Sep  4 22:08 /usr/lib64/libnvidia-allocator.so.615.71.09
@@ -1221,7 +1224,15 @@ Sep 11 05:21:58 hami-workshop systemd[1]: Started NVIDIA Persistence Daemon.
 ```
 
 
-### k8s
+### k3s 설치
+
+간단한 k8s 실습을 위해 k3s를 설치한다. 이후 ontainerd의 NVIDIA runtime 설정, nvidia RuntimeClass를 활성화한다.  
+
+NVIDIA k8s device plugin `v0.20.0`을 배포하고, DaemonSet과 Pod가 정상 Running 상태인지 확인합니다. 
+
+그리고나서 노드 정보를 조회해, 노드가 nvidia.com/gpu allocatable 값이 1로 잡히는지 확인한다.
+
+
 기존 도커 삭제
 ```sh
 # 1. 상태 사전 확인
@@ -1940,6 +1951,9 @@ kubectl delete pod gpu-test
 ```
 
 ### kube-promethues-stack
+
+kube-prometheus-stack를 배포하며, 프로메테우스와 그라파나는 NodePort로 설정한다. 
+
 ```sh
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
@@ -2127,7 +2141,10 @@ open http://127.0.0.1:30002
 
 
 ### DCGM Exporter
-그라파나 uid : 12239 or 
+
+그라파나에서 gpu 메트릭 정보를 수집하기 위해 DCGM Exporter를 배포한다.
+
+그라파나 대쉬보드 uid는 `12239` 이다.
 
 ```sh
 helm repo add nvidia https://nvidia.github.io/dcgm-exporter/helm-charts
@@ -2356,6 +2373,16 @@ sudo systemctl restart k3s
 ```
 
 ### vLLM 배포
+
+- vllm ns 생성, vllm/vllm-openai:v0.28.0 이미지 활용하여 vllm 서빙
+  - --served-model-name skt/A.X-4.0-Light
+  - --load-format runai_streamer
+  - --max-model-len 8192
+  - --enable-auto-tool-choice
+  - --tool-call-parser hermes
+- minio에 `skt/A.X-4.0-Light` 모델을 저장하여 모델 로딩, 모델 크기 약 13.53
+
+
 ```sh
 # minio 배포
 kubectl create namespace vllm
@@ -2733,6 +2760,8 @@ kubectl delete ns vllm
 
 ### Hami
 
+노드에 gpu=on 라벨을 추가하여, hami가 gpu 가상화 레이어를 추상화하여 제공하는지 확인한다
+
 ```sh
 NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
 kubectl label nodes ${NODE_NAME} gpu=on
@@ -2776,11 +2805,7 @@ helm install hami-webui hami-webui/hami-webui \
 kubectl get pod -n kube-system -l app.kubernetes.io/name=hami-webui
 kubectl get servicemonitors -n kube-system
 kubectl get svc -n kube-system hami-webui
-
 ```
-
-### EKS
-
 
 Reference
 - https://docs.rockylinux.org/10/desktop/display/installing_nvidia_gpu_drivers/

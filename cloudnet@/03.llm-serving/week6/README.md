@@ -79,7 +79,7 @@ ZONES=$(gcloud compute accelerator-types list \
   --filter='name="nvidia-tesla-t4"' \
   --format='value(zone)')
 
-for MACHINE_TYPE in n1-standard-4 n1-standard-8; do
+for MACHINE_TYPE in n1-standard-8; do
   for ZONE in $ZONES; do
     echo "Trying: $ZONE / $MACHINE_TYPE"
 
@@ -2399,6 +2399,9 @@ sudo systemctl restart k3s
   - --enable-auto-tool-choice
   - --tool-call-parser hermes
 - minio에 `skt/A.X-4.0-Light` 모델을 저장하여 모델 로딩, 모델 크기 약 13.53
+  - port : 30003
+- vllm
+  - port : 30005
 
 
 ```sh
@@ -2522,7 +2525,7 @@ spec:
               mountPath: /model
       containers:
         - name: s3-upload
-          image: minio/mc:latest
+          image: quay.io/minio/mc:latest # minio/mc:latest
           command:
             - sh
             - -c
@@ -2608,9 +2611,7 @@ Bucket created successfully `localminio/models`.
 │ 13.53 GiB │ 13.53 GiB   │ 01m48s   │ 127.30 MiB/s │
 └───────────┴─────────────┴──────────┴──────────────┘
 
-
-
-
+# 실행에 약 4분 소요 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -2694,9 +2695,10 @@ service/vllm-server   NodePort   10.43.37.93   <none>        8000:30005/TCP   4m
 NAME                    ENDPOINTS         AGE
 endpoints/vllm-server   10.42.0.41:8000   4m12s
 
-curl -s http://34.116.226.203:30005/v1/models | python3 -m json.tool
+export MY_IP=$(curl -4 -s ifconfig.me)
+curl -s http://$MY_IP:30005/v1/models | python3 -m json.tool
 
-curl -s http://192.168.254.150:30005/v1/chat/completions \
+curl -s http://$MY_IP:30005/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "skt/A.X-4.0-Light",
@@ -2706,7 +2708,7 @@ curl -s http://192.168.254.150:30005/v1/chat/completions \
     "max_tokens": 50
   }' | jq .choices
 
-curl -N http://192.168.254.150:30005/v1/chat/completions \
+curl -N http://$MY_IP:30005/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "skt/A.X-4.0-Light",
@@ -2776,55 +2778,6 @@ spec:
 
 
 kubectl delete ns vllm
-```
-
-### Hami
-
-노드에 gpu=on 라벨을 추가하여, hami가 gpu 가상화 레이어를 추상화하여 제공하는지 확인한다
-
-```sh
-NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-kubectl label nodes ${NODE_NAME} gpu=on
-
-helm repo add hami-charts https://project-hami.github.io/HAMi/
-helm repo update
-helm install hami hami-charts/hami -n kube-system --version 2.9.0 --set devicePlugin.runtimeClassName=nvidia
-
-kubectl get mutatingwebhookconfigurations.admissionregistration.k8s.io hami-webhook
-
-
-kubectl get pod -n kube-system -l app.kubernetes.io/name=hami
-
-NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-kubectl get node ${NODE_NAME} -o jsonpath='{.metadata.annotations.hami\.io/node-nvidia-register}' | jq
-
-ls -l /usr/local/vgpu/
-nm -D /usr/local/vgpu/libvgpu.so
-nm -D /usr/local/vgpu/libvgpu.so | grep cuMemAlloc
-nm -D /usr/local/vgpu/libvgpu.so | grep cuMemcpy
-nm -D /usr/local/vgpu/libvgpu.so | grep cuLaunch
-nm -D /usr/local/vgpu/libvgpu.so | grep nvml
-
-kubectl describe pod -n kube-system -l app.kubernetes.io/component=hami-device-plugin
-
-kubectl describe pod -n kube-system -l app.kubernetes.io/component=hami-scheduler
-
-
-# hami-webui 설치
-helm install hami-webui hami-webui/hami-webui \
-  --set externalPrometheus.enabled=true \
-  --set externalPrometheus.address="http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090" \
-  --set dcgm-exporter.enabled=false \
-  --set service.type=NodePort \
-  --set env.frontend[0].name=TZ \
-  --set env.frontend[0].value=Asia/Seoul \
-  --set env.backend[0].name=TZ \
-  --set env.backend[0].value=Asia/Seoul \
-  -n kube-system
-
-kubectl get pod -n kube-system -l app.kubernetes.io/name=hami-webui
-kubectl get servicemonitors -n kube-system
-kubectl get svc -n kube-system hami-webui
 ```
 
 Reference

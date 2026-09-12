@@ -74,13 +74,6 @@ gcloud compute instances create ${VM_NAME} \
     --boot-disk-type=pd-ssd
 
 # 앞선 zone에서 VM 생성이 L4 gpu가 안잡히는 경우, 모든 zone에 대해서 탐색하여 vm 생성을 시도한다.
-export PROJECT_ID=tmp-20260911
-export VM_NAME=hami-workshop
-export GPU_TYPE=nvidia-tesla-t4
-export IMAGE_FAMILY=rocky-linux-9-optimized-gcp
-export IMAGE_PROJECT=rocky-linux-cloud
-export DISK_SIZE=100
-
 ZONES=$(gcloud compute accelerator-types list \
   --project="$PROJECT_ID" \
   --filter='name="nvidia-tesla-t4"' \
@@ -234,8 +227,7 @@ nvidia-smi
 |  No running processes found                                                             |
 +-----------------------------------------------------------------------------------------+
 
-
-
+# 커널 조회
 uname -a
 Linux hami-workshop 5.14.0-687.42.1+2.1.el9_8_ciq.x86_64 #1 SMP PREEMPT_DYNAMIC Thu Sep 3 14:13:50 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
 
@@ -2416,11 +2408,11 @@ kubectl create namespace vllm
 kubectl create secret generic minio-credentials \
   -n vllm \
   --from-literal=MINIO_ROOT_USER=minioadmin \
-  --from-literal=MINIO_ROOT_PASSWORD=sTwyoxUzs1x1SG4YRP17r2oC
+  --from-literal=MINIO_ROOT_PASSWORD=minioadmin
 
 kubectl create secret generic hf-token \
   -n vllm \
-  --from-literal=HF_TOKEN=hf
+  --from-literal=HF_TOKEN=''
 
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -2491,7 +2483,7 @@ spec:
       targetPort: 9001
       nodePort: 30003
 
-kubectl apply -f m.yaml
+kubectl apply -f minio.yaml
 
 kubectl get pvc -n vllm
 NAME         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
@@ -2549,6 +2541,8 @@ spec:
         - name: model
           emptyDir:
             sizeLimit: 20Gi
+
+kubectl apply -f job.yaml
 
 kubectl get job -n vllm
 NAME           STATUS     COMPLETIONS   DURATION   AGE
@@ -2687,7 +2681,7 @@ spec:
       targetPort: 8000
       nodePort: 30005
 
-
+kubectl apply -f vllm.yaml
 
 kubectl get deploy,svc,ep -n vllm vllm-server
 Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice

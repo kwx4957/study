@@ -665,8 +665,10 @@ exit
 
 TS 
 
-Chatgpt
+Chatgpt  
+
 /run/nvidia-persistenced/socket은 NVIDIA Container Toolkit이 만드는 파일이 아니라, 아래 서비스가 정상 기동될 때 생성된다.
+
 원인은 서비스가 처음 뜰 때 /dev/nvidia* 디바이스 파일이 아직 없어서 실패했고, 이후 디바이스 파일이 생겼지만 systemd가 “너무 빨리 여러 번 실패했다”고 판단해서 재시작을 막고 있었던 것입니다.
 
 ```sh
@@ -720,14 +722,16 @@ Sep 11 05:21:58 hami-workshop systemd[1]: Started NVIDIA Persistence Daemon.
 
 ### k3s 설치
 
-간단한 k8s 실습을 위해 k3s를 설치한다. 이후 ontainerd의 NVIDIA runtime 설정, nvidia RuntimeClass를 활성화한다.  
+간단한 k8s 실습을 위해 k3s를 설치한다. 이후 ontainerd의 NVIDIA runtime 설정, nvidia RuntimeClass를 활성화한다.    
 
-NVIDIA k8s device plugin `v0.20.0`을 배포하고, DaemonSet과 Pod가 정상 Running 상태인지 확인합니다. 
+NVIDIA k8s device plugin `v0.20.0`을 배포하고, DaemonSet과 Pod가 정상 Running 상태인지 확인합니다.   
 
-그리고나서 노드 정보를 조회해, 노드가 nvidia.com/gpu allocatable 값이 1로 잡히는지 확인한다.
+그리고나서 노드 정보를 조회해, 노드가 nvidia.com/gpu allocatable 값이 1로 잡히는지 확인한다.  
 
 
-기존 도커 삭제
+<br>
+
+기존 도커 삭제  
 ```sh
 # 1. 상태 사전 확인
 docker ps -a
@@ -836,21 +840,10 @@ cat /etc/rancher/k3s/k3s.yaml
 apiVersion: v1
 clusters:
 - cluster:
-    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJkekNDQVIyZ0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQWpNU0V3SHdZRFZRUUREQmhyTTNNdGMyVnkKZG1WeUxXTmhRREUzT0RreE1EUTRNREF3SGhjTk1qWXdPVEV4TURRek16SXdXaGNOTXpZd09UQTRNRFF6TXpJdwpXakFqTVNFd0h3WURWUVFEREJock0zTXRjMlZ5ZG1WeUxXTmhRREUzT0RreE1EUTRNREF3V1RBVEJnY3Foa2pPClBRSUJCZ2dxaGtqT1BRTUJCd05DQUFTUmhxWTBRSDNlRUYyUHNPY0dxQTcwUDNEakxLUkFDOUUvRXgvaS8ranUKUTZ0ZHVCa0dJdk04UG02VjM1dnJqT28zWjBjM2UwMTcvdWhFMjlmOEtYUDdvMEl3UURBT0JnTlZIUThCQWY4RQpCQU1DQXFRd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBZEJnTlZIUTRFRmdRVTdaMDU4alJWRnNyUmdyRjlKTnBIClQzd1pQbjh3Q2dZSUtvWkl6ajBFQXdJRFNBQXdSUUloQU5wRzZuMnFEVWg2U3hkeVE3aW93WWh5NnJFcG1vRkIKTFpqeXh6NitQeVBBQWlCS01LVytDMHpRcnBkWXR3V0dlTk04aGVqSjllRmdsWkY5Q3BvOEZEK1E3QT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    certificate-authority-data: 
     server: https://127.0.0.1:6443
   name: default
-contexts:
-- context:
-    cluster: default
-    user: default
-  name: default
-current-context: default
-kind: Config
-users:
-- name: default
-  user:
-    client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJrakNDQVRlZ0F3SUJBZ0lJV0tiRFdKQis3eEV3Q2dZSUtvWkl6ajBFQXdJd0l6RWhNQjhHQTFVRUF3d1kKYXpOekxXTnNhV1Z1ZEMxallVQXhOemc1TVRBME9EQXdNQjRYRFRJMk1Ea3hNVEEwTXpNeU1Gb1hEVEkzTURreApNVEEwTXpNeU1Gb3dNREVYTUJVR0ExVUVDaE1PYzNsemRHVnRPbTFoYzNSbGNuTXhGVEFUQmdOVkJBTVRESE41CmMzUmxiVHBoWkcxcGJqQlpNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQTBJQUJON2dkeHd1S0lhd21RWUEKTnByRVFjZ1JibGZPeEE4OW4yclBDbGVGb01UUWFOS2dJanhybERoZUNNcXdaUXYrMDYxclpJc0UxY3djUW82cApJK3U1VStXalNEQkdNQTRHQTFVZER3RUIvd1FFQXdJRm9EQVRCZ05WSFNVRUREQUtCZ2dyQmdFRkJRY0RBakFmCkJnTlZIU01FR0RBV2dCVFNDOElEd1BweTFCUjVIMTFhN285VkpmblN0REFLQmdncWhrak9QUVFEQWdOSkFEQkcKQWlFQTlHYU9XOVg3VncxVG11a01kaERLSFVCd3ZSandSQ0lodWIyRG5WREUxUHdDSVFDaWs2N0xxazRxL1JyNwphSUVTekFRVU15cGlraHV4VG0reUV1bkhWS2FZYmc9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCi0tLS0tQkVHSU4gQ0VSVElGSUNBVEUtLS0tLQpNSUlCZHpDQ0FSMmdBd0lCQWdJQkFEQUtCZ2dxaGtqT1BRUURBakFqTVNFd0h3WURWUVFEREJock0zTXRZMnhwClpXNTBMV05oUURFM09Ea3hNRFE0TURBd0hoY05Nall3T1RFeE1EUXpNekl3V2hjTk16WXdPVEE0TURRek16SXcKV2pBak1TRXdId1lEVlFRRERCaHJNM010WTJ4cFpXNTBMV05oUURFM09Ea3hNRFE0TURBd1dUQVRCZ2NxaGtqTwpQUUlCQmdncWhrak9QUU1CQndOQ0FBUzdLS2MvOXM0OUo1VmFoeW1KUEZOazJpb1pmTlhYdHd4ZFdaN3dzeFEwCnQ1d0xwaXNGdDY4MTFoTkR4K0t6OENKRlk3K2dNbGN4dmtwUkFqb1ZhZU9rbzBJd1FEQU9CZ05WSFE4QkFmOEUKQkFNQ0FxUXdEd1lEVlIwVEFRSC9CQVV3QXdFQi96QWRCZ05WSFE0RUZnUVUwZ3ZDQThENmN0UVVlUjlkV3U2UApWU1g1MHJRd0NnWUlLb1pJemowRUF3SURTQUF3UlFJZ1JjWXQzQldnU0sxVWRrSlQxdHB6TGtsTlZUQnEzeTZjCkU2czJzanIrOE1rQ0lRRGpXbWpIclBZOC95S21JU2RFMlhpTExnUElYbVlpR2pXOVFoOWlmV3N6OUE9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
-    client-key-data: LS0tLS1CRUdJTiBFQyBQUklWQVRFIEtFWS0tLS0tCk1IY0NBUUVFSUYwRVNpTEc5UlRmaUVKMk52MHE4ckw4ZmdQQytsR3NFbW11TzZ4czdGRjFvQW9HQ0NxR1NNNDkKQXdFSG9VUURRZ0FFM3VCM0hDNG9ockNaQmdBMm1zUkJ5QkZ1Vjg3RUR6MmZhczhLVjRXZ3hOQm8wcUFpUEd1VQpPRjRJeXJCbEMvN1RyV3RraXdUVnpCeENqcWtqNjdsVDVRPT0KLS0tLS1FTkQgRUMgUFJJVkFURSBLRVktLS0tLQo=
+...
 
 ln -s /etc/rancher/k3s/k3s.yaml ~/.kube/config
 
@@ -1116,9 +1109,9 @@ kubectl delete pod gpu-test
 
 ### kube-promethues-stack
 
-kube-prometheus-stack를 배포하며, 프로메테우스와 그라파나는 NodePort로 설정한다.   
-프로메테우스 : 30001  
-그라파나 : 30002   
+kube-prometheus-stack를 배포하며, 프로메테우스와 그라파나는 NodePort로 설정한다.     
+프로메테우스 : 30001    
+그라파나 : 30002     
 
 ```sh
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -1259,9 +1252,9 @@ open http://127.0.0.1:30002
 
 ### DCGM Exporter
 
-그라파나에서 gpu 메트릭 정보를 수집하기 위해 DCGM Exporter를 배포한다.
+그라파나에서 gpu 메트릭 정보를 수집하기 위해 DCGM Exporter를 배포한다. 
 
-그라파나 대쉬보드 uid는 `12239` 이다.
+그라파나 대쉬보드 uid는 `12239` 이다.  
 
 ```sh
 helm repo add nvidia https://nvidia.github.io/dcgm-exporter/helm-charts
@@ -1352,7 +1345,7 @@ Rounding up to the nearest multiple: 5000192.
 = 3877.770 single-precision GFLOP/s at 20 flops per interaction
 ```
 
-### Nvdia GPU Operator
+### Nvdia GPU Operator  
 Kubernetes Node Feature Discovery를 설치하면, 하드웨어가 가지고 있는 기능을 자동으로 탐색하여 노드의 라벨로 추가해준다. 상세한 정보를 담고 있기에 좋을수도 잇지만, 라벨링을 통해 유의미한 문제를 해결하지 않는다면, etcd에 저장 공간 및 쿼리등 불필요한 데이터만 쌓을수 있다는 단점을 갖고 있다.
 
 ```sh

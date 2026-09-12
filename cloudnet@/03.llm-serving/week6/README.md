@@ -107,6 +107,19 @@ done
 
 echo "All attempts failed."
 
+# VM 방화벽 개방
+export NETWORK=default
+export MY_IP=$(curl -4 -s ifconfig.me)
+
+gcloud compute firewall-rules create allow-workshop-my-ip \
+--project="$PROJECT_ID" \
+--network="$NETWORK" \
+  --direction=INGRESS \
+  --priority=1000 \
+  --action=ALLOW \
+  --rules=tcp:22,tcp:30001,tcp:30002,tcp:30003,tcp:30004,tcp:30005 \
+  --source-ranges="${MY_IP}/32"
+
 # vm 생성 직후 ssh 접속
 gcloud compute ssh kwx4957@hami-workshop \
   --project=tmp-20260911 \
@@ -116,6 +129,9 @@ gcloud compute ssh kwx4957@hami-workshop \
 ip -c -br addr
 lo               UNKNOWN        127.0.0.1/8 ::1/128
 eth0             UP             10.186.0.2/32 fe80::fe98:e607:d310:8683/64
+
+# vm 방화벽 비활성화, 테스트 용도
+sudo systemctl stop firewalld
 
 # 모든 작업이 끝난 직후, vm 및 디스크를 삭제한다.
 # vm 삭제
@@ -186,11 +202,17 @@ nvidia-open-615.71.09-1.el9.noarch
 dkms status
 nvidia/615.71.09: added
 
+# 의존성 설치 
+sudo dkms autoinstall
+
 # 모듈 의존성 갱신
 sudo depmod -a
 
 # 모듈 로드 
 sudo modprobe nvidia
+
+dkms status
+nvidia/615.71.09, 5.14.0-687.42.1+2.1.el9_8_ciq.x86_64, x86_64: installed
 
 nvidia-smi
 +-----------------------------------------------------------------------------------------+
@@ -212,8 +234,7 @@ nvidia-smi
 |  No running processes found                                                             |
 +-----------------------------------------------------------------------------------------+
 
-dkms status | grep -i nvidia
-nvidia/615.71.09, 5.14.0-687.42.1+2.1.el9_8_ciq.x86_64, x86_64: installed
+
 
 uname -a
 Linux hami-workshop 5.14.0-687.42.1+2.1.el9_8_ciq.x86_64 #1 SMP PREEMPT_DYNAMIC Thu Sep 3 14:13:50 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
@@ -347,10 +368,15 @@ rpm -qa | grep -iE 'nvidia|cuda|dkms|kernel-devel|kernel-headers'
 dkms status
 nvidia/615.71.09: added
 
+# 자동 설치
+sudo dkms autoinstall
+
 # 모듈 의존성 갱신
 sudo depmod -a
 
 sudo modprobe nvidia
+
+dkms status
 ```
 
 

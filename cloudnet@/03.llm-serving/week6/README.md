@@ -5,8 +5,8 @@
 ### 목차 
 
 - [1. VM 생성을 위한 GCP VM 설정](#VM-생성을-위한-GCP-설정)
-- [2. VM GPU 설정](2-VM-GPU-설정)
-- [3. LM Cache 동작 테스트](#3-lm-cache-동작-테스트)
+- [2. VM GPU 설정](VM-GPU-설정)
+- [3. GPU Docekr](#GPU-Docekr)
 - [4. LM Cache 실행 및 벤치](#4-lm-cache-실행-및-벤치)
   - [4.1 LM Cache bench bench test](#41-lm-cache-bench-bench-test)
 - [5. LM Cache & vllm 실행](#5-lm-cache--vllm-실행)
@@ -143,6 +143,7 @@ gcloud compute disks delete <DISK_NAME> \
 # lspci 설치
 sudo dnf install -y pciutils
 
+# pci 조회
 lspci | grep -i nvidia
 00:04.0 3D controller: NVIDIA Corporation TU104GL [Tesla T4] (rev a1)
 
@@ -158,7 +159,7 @@ sudo dnf install cuda-drivers -y
 
 reboot
 
-# 패키지는 설치되어있다. 
+# 패키지 설치 조회
 rpm -qa | grep -iE 'nvidia|cuda|dkms|kernel-devel|kernel-headers'
 kernel-headers-5.14.0-687.42.1+2.1.el9_8_ciq.x86_64
 kernel-devel-5.14.0-687.42.1+2.1.el9_8_ciq.x86_64
@@ -201,7 +202,6 @@ nvidia-smi
 | N/A   61C    P8             10W /   70W |       0MiB /  15360MiB |      0%      Default |
 |                                         |                        |                  N/A |
 +-----------------------------------------+------------------------+----------------------+
-
 +-----------------------------------------------------------------------------------------+
 | Processes:                                                                              |
 |  GPU   GI   CI              PID   Type   Process name                        GPU Memory |

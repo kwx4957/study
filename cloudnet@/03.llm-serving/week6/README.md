@@ -1,8 +1,30 @@
 ## LLM Serving 스터디 6주차
 
+> GCP GPU VM Rocky Linux 9 기반 NVIDIA GPU를 구성하고 저수준으로 gpu를 파악하고 컨테이너에서 k3s 이르기까지 vllm 기반 LLM 서빙을 실습한 내용입니다.
+
+### 목차 
+
+- [1. VM 생성을 위한 GCP VM 설정](#VM-생성을-위한-GCP-설정)
+- [2. VM GPU 설정](2-VM-GPU-설정)
+- [3. LM Cache 동작 테스트](#3-lm-cache-동작-테스트)
+- [4. LM Cache 실행 및 벤치](#4-lm-cache-실행-및-벤치)
+  - [4.1 LM Cache bench bench test](#41-lm-cache-bench-bench-test)
+- [5. LM Cache & vllm 실행](#5-lm-cache--vllm-실행)
+- [6. vllm이 LM Cache 사용한 경우와 사용하지 않은 경우 비교](#6-vllm이-lm-cache-사용한-경우와-사용하지-않은-경우-비교)
+  - [6.1 LM Cache 비활성화 로그](#61-lm-cache-비활성화-로그)
+  - [6.2 LM Cache 활성화 로그](#62-lm-cache-활성화-로그)
+- [7. vllm 요청 테스트](#7-vllm-요청-테스트)
+
+
 ### VM 생성을 위한 GCP 설정
 
+우선 gcp에서 순수한 VM을 생성하기 위해서 gcloud를 설치한다.   
+스펙은 GPU는 `T4`와 OS `Rocky 9`, 디스크 용량은 `100GB`, MACHINE_TYPE은 `n1-standard-8`, zons은 `asia-northeast3-c` 이다
+
+하지만 gcp에서 vm 생성할 시 gpu 자원이 모자라서 쉽게 생성되지 않는다. 이 경우 모든 zones를 디스커버리하여 t4타입의 vm 을 생성할수 잇도록 했다.
+
 ```sh
+# gcp 패키지 레포짙리 추가
 sudo tee -a /etc/yum.repos.d/google-cloud-sdk.repo << EOM
 [google-cloud-cli]
 name=Google Cloud CLI
@@ -17,9 +39,10 @@ sudo dnf install libxcrypt-compat.x86_64
 
 sudo dnf install google-cloud-cli
 
+# gcloud 초기작업
 gcloud init --console-only
 
-# 인증
+# 프로젝트 생성
 gcloud projects create tmp-20260911   --name="tmp-test"
 
 gcloud auth list
@@ -28,8 +51,10 @@ gcloud config list
 
 gcloud projects list
 
+# 기본 프로젝트 설정
 gcloud config set project tmp-20260911
 
+# VM 생성 명렁어 
 export PROJECT_ID=$(gcloud config get-value project)
 export ZONE=asia-northeast3-c
 export VM_NAME=hami-workshop
@@ -50,7 +75,7 @@ gcloud compute instances create ${VM_NAME} \
     --boot-disk-size=${DISK_SIZE}GB \
     --boot-disk-type=pd-ssd
 
-# L4 gpu가 안잡히는 경우
+# 앞선 zone에서 VM 생성이 L4 gpu가 안잡히는 경우, 모든 zone에 대해서 탐색하여 vm 생성을 시도한다.
 export PROJECT_ID=tmp-20260911
 export VM_NAME=hami-workshop
 export GPU_TYPE=nvidia-tesla-t4
@@ -84,16 +109,17 @@ done
 
 echo "All attempts failed."
 
-
-# ssh 접속
+# vm 생성 직후 ssh 접속
 gcloud compute ssh kwx4957@hami-workshop \
   --project=tmp-20260911 \
   --zone=europe-central2-b
 
+# ip 확인
 ip -c -br addr
 lo               UNKNOWN        127.0.0.1/8 ::1/128
 eth0             UP             10.186.0.2/32 fe80::fe98:e607:d310:8683/64
 
+# 모든 작업이 끝난 직후, vm 및 디스크를 삭제한다.
 # vm 삭제
 gcloud compute instances list \
   --project=tmp-20260911
@@ -112,7 +138,7 @@ gcloud compute disks delete <DISK_NAME> \
 ```
 
 
-### GPU VM
+### VM GPU 설정
 ```sh
 # lspci 설치
 sudo dnf install -y pciutils

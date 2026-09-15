@@ -7,7 +7,7 @@
 - [3. AWS Chips](#AWS-Chips)
 - [4. Tensor Parallelism](#Tensor-Parallelism)
 - [5. vLLM](#vLLM)
-- [6. NeuronX Distributed (NxD)](#NeuronX-Distributed-(NxD))
+- [6. NeuronX Distributed (NxD)](#NeuronX-Distributed-NxD)
 - [7. EKS](#EKS)
 - [8. Architecture](#Architecture)
 - [9. Lab](#Lab)
@@ -571,7 +571,7 @@ Configure Monitoring: Set up CloudWatch integration and custom metrics
 Implement Security: Configure RBAC, network policies, and IAM roles
 Amazon EKS provides the foundation for running production-ready vLLM workloads with enterprise-grade reliability, security, and scalability.
 
-### Workshop Architecture
+### Architecture
 Workshop Architecture
 Overview
 This workshop demonstrates enterprise-scale deployment of Large Language Models using vLLM on Amazon EKS with AWS Trainium/Inferentia instances. The architecture leverages AWS AI Chips for cost-effective, high-performance LLM inference with advanced optimization techniques.

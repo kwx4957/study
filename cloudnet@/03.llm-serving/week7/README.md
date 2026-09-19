@@ -823,6 +823,38 @@ curl -sG "http://${MY_IP}:30001/api/v1/query" \
 open http://$MY_IP:30002
 
 curl -s http://${MY_IP}:30004/v1/models | python3 -m json.tool
+{
+    "object": "list",
+    "data": [
+        {
+            "id": "Qwen3-0.6B-FP8",
+            "object": "model",
+            "created": 1789853888,
+            "owned_by": "vllm",
+            "root": "s3://models/Qwen3-0.6B-FP8",
+            "parent": null,
+            "max_model_len": 8192,
+            "permission": [
+                {
+                    "id": "modelperm-8913cb9901ba7284",
+                    "object": "model_permission",
+                    "created": 1789853888,
+                    "allow_create_engine": false,
+                    "allow_sampling": true,
+                    "allow_logprobs": true,
+                    "allow_search_indices": false,
+                    "allow_view": true,
+                    "allow_fine_tuning": false,
+                    "organization": "*",
+                    "group": null,
+                    "is_blocking": false
+                }
+            ]
+        }
+    ]
+}
+
+# output
 curl -s http://${MY_IP}:30004/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
@@ -832,25 +864,46 @@ curl -s http://${MY_IP}:30004/v1/chat/completions \
     ],
     "max_tokens": 50
   }' | jq .choices
+ [
+  {
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "<think>\nOkay, the user is asking about the capital of South Korea. Let me start by recalling that South Korea's capital is Seoul, right? I think it's the capital city. Now, I need to make sure I don't mix up",
+      "refusal": null,
+      "annotations": null,
+      "audio": null,
+      "function_call": null,
+      "reasoning": null
+    },
+    "logprobs": null,
+    "finish_reason": "length",
+    "stop_reason": null,
+    "token_ids": null,
+    "routed_experts": null
+  }
+]
 ```
 
 ### llm-d
 ```sh
-0/standard-install.yaml
-
+# gateway-api 배포
 kubectl apply --server-side=true -f \
   https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v1.0.2/manifests.yaml
-  
+
+# envoy-gateway 배포
 helm upgrade --install envoy-gateway \
   oci://docker.io/envoyproxy/gateway-helm \
   --version v1.9.1 \
   --namespace envoy-gateway-system \
   --create-namespace \
   --skip-crds
-  
+
+# ai gateway crd 배포
 helm upgrade -i aieg-crd oci://docker.io/envoyproxy/ai-gateway-crds-helm \
   --version v1.1.0 -n envoy-ai-gateway-system --create-namespace
 
+# ai gateway 배포 
 helm upgrade -i aieg oci://docker.io/envoyproxy/ai-gateway-helm \
   --version v1.1.0 -n envoy-ai-gateway-system --create-namespace
   
@@ -875,6 +928,21 @@ kubectl get crd inferencepools.inference.networking.x-k8s.io
 NAME                                           CREATED AT
 inferencepools.inference.networking.x-k8s.io   2026-09-19T20:46:54Z
 
+kubectl get deploy,pod -n envoy-gateway-system -l app.kubernetes.io/component=proxy -owide
+NAME                                                                   READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS               IMAGES                                                                                                                                                      SELECTOR
+deployment.apps/envoy-default-inference-pool-with-aigwroute-d416582c   1/1     1            1           61m   envoy,shutdown-manager   docker.io/envoyproxy/envoy:distroless-v1.39.1@sha256:eb2c01c13125d1629637cb4e4cce7207009fb7cc2c8027f9742758549d15b6f4,docker.io/envoyproxy/gateway:v1.9.1   app.kubernetes.io/component=proxy,app.kubernetes.io/managed-by=envoy-gateway,app.kubernetes.io/name=envoy,gateway.envoyproxy.io/owning-gateway-name=inference-pool-with-aigwroute,gateway.envoyproxy.io/owning-gateway-namespace=default
+NAME                                                                  READY   STATUS    RESTARTS   AGE   IP           NODE    NOMINATED NODE   READINESS GATES
+pod/envoy-default-inference-pool-with-aigwroute-d416582c-7889fmnknn   3/3     Running   0          60m   10.42.0.64   llm-d   <none>           <none>
+
+
+kubectl get svc,ep -n envoy-gateway-system -l app.kubernetes.io/component=proxy
+NAME                                                           TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+service/envoy-default-inference-pool-with-aigwroute-d416582c   LoadBalancer   10.43.51.113   10.178.0.3    80:32067/TCP   61m
+NAME                                                             ENDPOINTS          AGE
+endpoints/envoy-default-inference-pool-with-aigwroute-d416582c   10.42.0.64:10080   61m
+
+
+# EPP 배포
 cat <<'EOF' | kubectl apply -f -
 ---
 apiVersion: v1
@@ -1045,5 +1113,281 @@ spec:
     port:
       number: 9002
 EOF
+
+
+# inferencepool 조회
+kubectl get inferencepool -n vllm qwen3-router
+NAME           AGE
+qwen3-router   52m
+
+# inferencepool 설정 
+kubectl get inferencepool -n vllm qwen3-router -o yaml
+apiVersion: inference.networking.k8s.io/v1
+kind: InferencePool
+metadata:
+  annotations:
+spec:
+  endpointPickerRef:
+    failureMode: FailClose
+    group: ""
+    kind: Service
+    name: qwen3-router-epp
+    port:
+      number: 9002
+  selector:
+    matchLabels:
+      app: qwen3-0-6b-fp8
+  targetPorts:
+  - number: 8000
+status: {}
+
+
+kubectl get svc,ep -n vllm -l app=qwen3-0-6b-fp8
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                     TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/qwen3-0-6b-fp8   NodePort   10.43.176.105   <none>        8000:30004/TCP   67m
+NAME                       ENDPOINTS         AGE
+endpoints/qwen3-0-6b-fp8   10.42.0.66:8000   67m
+
+
+kubectl get deploy -n vllm qwen3-router-epp -owide
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                                       SELECTOR
+qwen3-router-epp   1/1     1            1           11m   epp          registry.k8s.io/gateway-api-inference-extension/epp:v1.0.1   app=qwen3-router-epp
+
+
+kubectl describe deploy -n vllm qwen3-router-epp
+ame:                   qwen3-router-epp
+Namespace:              vllm
+CreationTimestamp:      Sat, 19 Sep 2026 20:50:30 +0000
+Labels:                 <none>
+Annotations:            deployment.kubernetes.io/revision: 4
+Selector:               app=qwen3-router-epp
+Replicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:           app=qwen3-router-epp
+  Annotations:      kubectl.kubernetes.io/restartedAt: 2026-09-19T20:58:40Z
+  Service Account:  qwen3-router-epp
+  Containers:
+   epp:
+    Image:       registry.k8s.io/gateway-api-inference-extension/epp:v1.0.1
+    Ports:       9002/TCP (grpc), 9003/TCP (grpc-health), 9090/TCP (metrics)
+    Host Ports:  0/TCP (grpc), 0/TCP (grpc-health), 0/TCP (metrics)
+    Args:
+      --pool-name
+      qwen3-router
+      --pool-namespace
+      vllm
+      --v
+      4
+      --zap-encoder
+      json
+      --grpc-port
+      9002
+      --grpc-health-port
+      9003
+      --config-file
+      /config/default-plugins.yaml
+    Environment:  <none>
+    Mounts:
+      /config from config (rw)
+  Volumes:
+   config:
+    Type:          ConfigMap (a volume populated by a ConfigMap)
+    Name:          qwen3-router-epp-config
+    Optional:      false
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  qwen3-router-epp-64498d85c4 (0/0 replicas created), qwen3-router-epp-5787f59467 (0/0 replicas created), qwen3-router-epp-849c58985c (0/0 replicas created)
+NewReplicaSet:   qwen3-router-epp-86f588c844 (1/1 replicas created)
+
+
+kubectl get cm -n vllm qwen3-router-epp -o yaml
+apiVersion: v1
+data:
+  default-plugins.yaml: |
+    apiVersion: inference.networking.x-k8s.io/v1alpha1
+    kind: EndpointPickerConfig
+    plugins:
+      - type: queue-scorer
+    schedulingProfiles:
+      - name: default
+        plugins:
+          - pluginRef: queue-scorer
+kind: ConfigMap
+metadata:
+  annotations:
+  name: qwen3-router-epp-config
+  namespace: vllm
+
+kubectl logs -n vllm -l app=qwen3-router-epp -f
+{"level":"Level(-4)","ts":"2026-09-19T21:52:23Z","logger":"controller-runtime.cache","caller":"cache/reflector.go:946","msg":"Watch close","reflector":"pkg/mod/k8s.io/client-go@v0.33.4/tools/cache/reflector.go:285","type":"*v1alpha2.InferenceObjective","totalItems":8}
+
+
+cat <<'EOF' | kubectl apply -f -
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-qwen3-router-from-default
+  namespace: vllm
+spec:
+  from:
+    - group: aigateway.envoyproxy.io
+      kind: AIGatewayRoute
+      namespace: default
+  to:
+    - group: inference.networking.k8s.io
+      kind: InferencePool
+      name: qwen3-router
+---
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: qwen3-router
+  namespace: default
+spec:
+  parentRefs:
+    - name: inference-pool-with-aigwroute
+      namespace: default
+      group: gateway.networking.k8s.io
+      kind: Gateway
+  rules:
+    - matches:
+        - headers:
+            - type: Exact
+              name: x-ai-eg-model
+              value: Qwen3-0.6B-FP8
+      backendRefs:
+        - group: inference.networking.k8s.io
+          kind: InferencePool
+          name: qwen3-router
+          namespace: vllm
+EOF
+
+kubectl get gateway
+NAME                            CLASS                           ADDRESS      PROGRAMMED   AGE
+inference-pool-with-aigwroute   inference-pool-with-aigwroute   10.178.0.3   True         78m
+
+kubectl get aigatewayroute qwen3-router -n default -o yaml
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: qwen3-router
+  namespace: default
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: inference-pool-with-aigwroute
+    namespace: default
+  rules:
+  - backendRefs:
+    - group: inference.networking.k8s.io
+      kind: InferencePool
+      name: qwen3-router
+      namespace: vllm
+      priority: 0
+      weight: 1
+    matches:
+    - headers:
+      - name: x-ai-eg-model
+        type: Exact
+        value: Qwen3-0.6B-FP8
+    modelsOwnedBy: Envoy AI Gateway
+
+kubectl describe aigatewayroute qwen3-router -n default
+Name:         qwen3-router
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+API Version:  aigateway.envoyproxy.io/v1beta1
+Kind:         AIGatewayRoute
+Spec:
+  Parent Refs:
+    Group:      gateway.networking.k8s.io
+    Kind:       Gateway
+    Name:       inference-pool-with-aigwroute
+    Namespace:  default
+  Rules:
+    Backend Refs:
+      Group:      inference.networking.k8s.io
+      Kind:       InferencePool
+      Name:       qwen3-router
+      Namespace:  vllm
+      Priority:   0
+      Weight:     1
+    Matches:
+      Headers:
+        Name:         x-ai-eg-model
+        Type:         Exact
+        Value:        Qwen3-0.6B-FP8
+    Models Owned By:  Envoy AI Gateway
+Events:               <none>
+
+kubectl get gateway inference-pool-with-aigwroute -n default
+NAME                            CLASS                           ADDRESS      PROGRAMMED   AGE
+inference-pool-with-aigwroute   inference-pool-with-aigwroute   10.178.0.3   True         78m
+
+curl -sS --max-time 90 \
+>   "http://${MY_IP}:30004/v1/chat/completions" \
+>   -H 'Content-Type: application/json' \
+>   -H 'x-ai-eg-model: Qwen3-0.6B-FP8' \
+>   -d '{
+>     "model": "Qwen3-0.6B-FP8",
+>     "messages": [
+>       {
+>         "role": "user",
+>         "content": "한국의 수도는 어디야?"
+>       }
+>     ],
+>     "max_tokens": 50
+>   }' | jq .
+{
+  "id": "chatcmpl-b75a0015b4f99fe9",
+  "object": "chat.completion",
+  "created": 1789855299,
+  "model": "Qwen3-0.6B-FP8",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "<think>\nOkay, the user is asking where the capital of South Korea is. First, I need to confirm the correct answer. South Korea's capital is Seattle. That's where the Seoul capital would be in a country. I should mention the country",
+        "refusal": null,
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "reasoning": null
+      },
+      "logprobs": null,
+      "finish_reason": "length",
+      "stop_reason": null,
+      "token_ids": null,
+      "routed_experts": null
+    }
+  ],
+  "service_tier": null,
+  "system_fingerprint": "vllm-0.28.0-dd5bf5d6",
+  "usage": {
+    "prompt_tokens": 16,
+    "total_tokens": 66,
+    "completion_tokens": 50,
+    "prompt_tokens_details": null,
+    "completion_tokens_details": null
+  },
+  "prompt_logprobs": null,
+  "prompt_token_ids": null,
+  "prompt_text": null,
+  "kv_transfer_params": null,
+  "ec_transfer_params": null,
+  "metrics": null
+}
 
 ```

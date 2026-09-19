@@ -9,9 +9,40 @@
 - [4. Hami](#Hami)
 - [5. Minio](#Minio)
 - [6. vllm 배포](#vllm-배포)
+- [7. llm-d](#llm-d)
 
 ### VM-생성을-위한-GCP-설정
 ```sh
+brew update && brew install --cask gcloud-cli
+gcloud init --console-only
+
+export PROJECT_ID="$(gcloud config get-value project)"
+export VM_NAME="lld-d"
+export MACHINE_TYPE="g2-standard-4"
+export IMAGE_FAMILY="rocky-linux-9-optimized-gcp"
+export IMAGE_PROJECT="rocky-linux-cloud"
+export DISK_SIZE=100
+
+ZONES="$(gcloud compute machine-types list \
+  --project="$PROJECT_ID" \
+  --filter="name=$MACHINE_TYPE" \
+  --format='value(zone)')"
+
+for ZONE in $ZONES; do
+  echo "Trying: $ZONE / $MACHINE_TYPE"
+
+  gcloud compute instances create "$VM_NAME" \
+    --project="$PROJECT_ID" \
+    --zone="$ZONE" \
+    --machine-type="$MACHINE_TYPE" \
+    --image-family="$IMAGE_FAMILY" \
+    --image-project="$IMAGE_PROJECT" \
+    --boot-disk-size="${DISK_SIZE}GB" \
+    --boot-disk-type=pd-balanced \
+    --maintenance-policy=TERMINATE && exit 0
+
+  echo "Failed: $ZONE / $MACHINE_TYPE"
+done
 
 export NETWORK=default
 export MY_IP=$(curl -4 -s ifconfig.me)
@@ -789,7 +820,230 @@ curl -sG "http://${MY_IP}:30001/api/v1/query" \
 
 # Grafana 대시보드 확인
 # admin / prom-operator
-open http://$MY_IP:30002   
+open http://$MY_IP:30002
+
+curl -s http://${MY_IP}:30004/v1/models | python3 -m json.tool
+curl -s http://${MY_IP}:30004/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen3-0.6B-FP8",
+    "messages": [
+      {"role": "user", "content": "한국의 수도는 어디야?"}
+    ],
+    "max_tokens": 50
+  }' | jq .choices
 ```
 
-### vllm 
+### llm-d
+```sh
+0/standard-install.yaml
+
+kubectl apply --server-side=true -f \
+  https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v1.0.2/manifests.yaml
+  
+helm upgrade --install envoy-gateway \
+  oci://docker.io/envoyproxy/gateway-helm \
+  --version v1.9.1 \
+  --namespace envoy-gateway-system \
+  --create-namespace \
+  --skip-crds
+  
+helm upgrade -i aieg-crd oci://docker.io/envoyproxy/ai-gateway-crds-helm \
+  --version v1.1.0 -n envoy-ai-gateway-system --create-namespace
+
+helm upgrade -i aieg oci://docker.io/envoyproxy/ai-gateway-helm \
+  --version v1.1.0 -n envoy-ai-gateway-system --create-namespace
+  
+kubectl apply -f \
+  https://raw.githubusercontent.com/theagentrouter/agent-router/main/examples/inference-pool/base.yaml
+
+kubectl apply -f \
+  https://raw.githubusercontent.com/theagentrouter/agent-router/main/examples/inference-pool/aigwroute.yaml
+
+kubectl rollout restart -n envoy-gateway-system deployment/envoy-gateway
+
+kubectl get pods -n envoy-ai-gateway-system
+NAME                                     READY   STATUS    RESTARTS   AGE
+ai-gateway-controller-59899b6864-fgzm6   1/1     Running   0          67s
+
+kubectl get pods -n envoy-gateway-system
+NAME                                                              READY   STATUS    RESTARTS   AGE
+envoy-default-inference-pool-with-aigwroute-d416582c-7889fmnknn   3/3     Running   0          50s
+envoy-gateway-8d45c6b4f-cdqqj                                     1/1     Running   0          46s
+
+kubectl get crd inferencepools.inference.networking.x-k8s.io
+NAME                                           CREATED AT
+inferencepools.inference.networking.x-k8s.io   2026-09-19T20:46:54Z
+
+cat <<'EOF' | kubectl apply -f -
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: qwen3-router-epp
+  namespace: vllm
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: qwen3-router-epp-read
+  namespace: vllm
+rules:
+  # Stable InferencePool API used by qwen3-router
+  - apiGroups:
+      - inference.networking.k8s.io
+    resources:
+      - inferencepools
+    verbs:
+      - get
+      - list
+      - watch
+
+  # Inference Extension API watched by EPP
+  - apiGroups:
+      - inference.networking.x-k8s.io
+    resources:
+      - inferenceobjectives
+      - inferencepools
+    verbs:
+      - get
+      - list
+      - watch
+
+  # EPP discovers Ready Qwen Pods using the Pool selector
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: qwen3-router-epp-read
+  namespace: vllm
+subjects:
+  - kind: ServiceAccount
+    name: qwen3-router-epp
+    namespace: vllm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: qwen3-router-epp-read
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qwen3-router-epp-config
+  namespace: vllm
+data:
+  default-plugins.yaml: |
+    apiVersion: inference.networking.x-k8s.io/v1alpha1
+    kind: EndpointPickerConfig
+    plugins:
+      - type: queue-scorer
+    schedulingProfiles:
+      - name: default
+        plugins:
+          - pluginRef: queue-scorer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen3-router-epp
+  namespace: vllm
+spec:
+  type: ClusterIP
+  selector:
+    app: qwen3-router-epp
+  ports:
+    - name: grpc
+      port: 9002
+      targetPort: grpc
+      appProtocol: kubernetes.io/h2c
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen3-router-epp
+  namespace: vllm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qwen3-router-epp
+  template:
+    metadata:
+      labels:
+        app: qwen3-router-epp
+    spec:
+      serviceAccountName: qwen3-router-epp
+      terminationGracePeriodSeconds: 130
+      containers:
+        - name: epp
+          image: registry.k8s.io/gateway-api-inference-extension/epp:v1.0.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --pool-name
+            - qwen3-router
+            - --pool-namespace
+            - vllm
+            - --v
+            - "4"
+            - --zap-encoder
+            - json
+            - --grpc-port
+            - "9002"
+            - --grpc-health-port
+            - "9003"
+            - --config-file
+            - /config/default-plugins.yaml
+          ports:
+            - name: grpc
+              containerPort: 9002
+            - name: grpc-health
+              containerPort: 9003
+            - name: metrics
+              containerPort: 9090
+          readinessProbe:
+            grpc:
+              port: 9003
+              service: inference-extension
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            grpc:
+              port: 9003
+              service: inference-extension
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: qwen3-router-epp-config
+---
+apiVersion: inference.networking.k8s.io/v1
+kind: InferencePool
+metadata:
+  name: qwen3-router
+  namespace: vllm
+spec:
+  targetPorts:
+    - number: 8000
+  selector:
+    matchLabels:
+      app: qwen3-0-6b-fp8
+  endpointPickerRef:
+    name: qwen3-router-epp
+    port:
+      number: 9002
+EOF
+
+```

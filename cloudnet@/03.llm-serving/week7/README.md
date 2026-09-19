@@ -1,7 +1,5 @@
 ## LLM Serving 스터디 7주차
 
->
-
 ### 목차 
 - [1. VM 생성을 위한 GCP VM 설정](#VM-생성을-위한-GCP-설정)
 - [2. k3s 설치 및 gpu 설정](#k3s-설치-및-gpu-설정)
@@ -886,8 +884,26 @@ curl -s http://${MY_IP}:30004/v1/chat/completions \
 ```
 
 ### llm-d
+전체 구조  
+AIGatewayRoute가 vllm pod를 고르지 않rh InferencePool-> EPP를 거쳐 vllm pod의 엔드포인트를 서택한다. 
 ```sh
-# gateway-api 배포
+Client
+  ↓
+Gateway
+  ↓
+AIGatewayRoute
+  ↓
+InferencePool
+  ↓
+EPP
+  ↓
+queue-scorer
+  ↓
+적절한 vLLM Pod
+``
+
+```sh
+# gateway-api Inference Extension CRD/리소스 설치
 kubectl apply --server-side=true -f \
   https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v1.0.2/manifests.yaml
 
@@ -899,7 +915,7 @@ helm upgrade --install envoy-gateway \
   --create-namespace \
   --skip-crds
 
-# ai gateway crd 배포
+# ai gateway controller crd 배포
 helm upgrade -i aieg-crd oci://docker.io/envoyproxy/ai-gateway-crds-helm \
   --version v1.1.0 -n envoy-ai-gateway-system --create-namespace
 
@@ -943,6 +959,7 @@ endpoints/envoy-default-inference-pool-with-aigwroute-d416582c   10.42.0.64:1008
 
 
 # EPP 배포
+# InferencePool 엔드포인트 상태 확인 후 요청 처리 vllm pod 선택
 cat <<'EOF' | kubectl apply -f -
 ---
 apiVersion: v1
@@ -1097,6 +1114,7 @@ spec:
           configMap:
             name: qwen3-router-epp-config
 ---
+# vLLM Pod들을 하나의 추론 Pool로 묶는다
 apiVersion: inference.networking.k8s.io/v1
 kind: InferencePool
 metadata:
@@ -1231,6 +1249,7 @@ kubectl logs -n vllm -l app=qwen3-router-epp -f
 {"level":"Level(-4)","ts":"2026-09-19T21:52:23Z","logger":"controller-runtime.cache","caller":"cache/reflector.go:946","msg":"Watch close","reflector":"pkg/mod/k8s.io/client-go@v0.33.4/tools/cache/reflector.go:285","type":"*v1alpha2.InferenceObjective","totalItems":8}
 
 
+# 다른 네임스페이스의 InferencePool을 AIGatewayRoute에서 참조할 수 있도록 허용
 cat <<'EOF' | kubectl apply -f -
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
@@ -1335,6 +1354,7 @@ kubectl get gateway inference-pool-with-aigwroute -n default
 NAME                            CLASS                           ADDRESS      PROGRAMMED   AGE
 inference-pool-with-aigwroute   inference-pool-with-aigwroute   10.178.0.3   True         78m
 
+# 'x-ai-eg-model 해당 헤더가 필수로 필요하다 
 curl -sS --max-time 90 \
 >   "http://${MY_IP}:30004/v1/chat/completions" \
 >   -H 'Content-Type: application/json' \

@@ -3,17 +3,14 @@
 >
 
 ### 목차 
-
 - [1. VM 생성을 위한 GCP VM 설정](#VM-생성을-위한-GCP-설정)
-- [2. VM GPU 설정](#vm-gpu-설정)
-- [3. GPU Docekr](#GPU-Docekr)
-- [4. k3s 설치](#k3s-설치)
-- [5. kube-promethues-stack 설치](#kube-promethues-stack)
-- [6. DCGM Exporter 설치](#DCGM-Exporter)
-- [7. Nvdia GPU Operator](#Nvdia-GPU-Operator)
-- [8. vllm 배포](#vllm-배포)
+- [2. k3s 설치 및 gpu 설정](#k3s-설치-및-gpu-설정)
+- [3. kube-promethues-stack 설치](#kube-promethues-stack)
+- [4. Hami](#Hami)
+- [5. Minio](#Minio)
+- [6. vllm 배포](#vllm-배포)
 
-### GCP VM 생성 
+### VM-생성을-위한-GCP-설정
 ```sh
 
 export NETWORK=default
@@ -173,11 +170,13 @@ llm-d   nvidia.com/mig.capable=false
 llm-d   nvidia.com/mig.strategy=single
 llm-d   nvidia.com/mps.capable=false
 llm-d   nvidia.com/vgpu.present=false
+```
 
+
+### kube-promethues-stack
+```sh
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
-
-kubectl get sc
 
 export MY_IP=$(curl -4 -s ifconfig.me)
 
@@ -198,8 +197,6 @@ prometheus:
           resources:
             requests:
               storage: 20Gi
-
-
 grafana:
   defaultDashboardsTimezone: Asia/Seoul
   adminPassword: prom-operator
@@ -213,7 +210,6 @@ grafana:
     accessModes:
       - ReadWriteOnce
     size: 10Gi
-
 alertmanager:
   alertmanagerSpec:
     storage:
@@ -225,12 +221,10 @@ alertmanager:
           resources:
             requests:
               storage: 5Gi
-
 prometheus-windows-exporter:
   prometheus:
     monitor:
       enabled: false
-      
 kubeControllerManager:
   enabled: true
   endpoints:
@@ -243,7 +237,6 @@ kubeControllerManager:
     enabled: true
     https: true
     insecureSkipVerify: true
-
 kubeScheduler:
   enabled: true
   endpoints:
@@ -256,7 +249,6 @@ kubeScheduler:
     enabled: true
     https: true
     insecureSkipVerify: true
-
 kubeProxy:
   enabled: true
   endpoints:
@@ -280,7 +272,7 @@ helm list -n monitoring
 NAME                    NAMESPACE       REVISION        UPDATED                                  STATUS          CHART                           APP VERSION
 kube-prometheus-stack   monitoring      4               2026-09-19 19:01:16.619555402 +0000 UTC  deployed        kube-prometheus-stack-87.5.1    v0.92.1
 
-kubectl get pod,svc,ingress,pvc -n monitoring
+kubectl get pod,svc,ingress -n monitoring
 NAME                                                            READY   STATUS    RESTARTS   AGE
 pod/alertmanager-kube-prometheus-stack-alertmanager-0           2/2     Running   0          4m38s
 pod/kube-prometheus-stack-grafana-ffb8dcc6b-kln7q               3/3     Running   0          4m44s
@@ -298,11 +290,6 @@ service/kube-prometheus-stack-operator                   ClusterIP   10.43.205.9
 service/kube-prometheus-stack-prometheus                 NodePort    10.43.55.196    <none>        9090:30001/TCP,8080:32271/TCP   4m44s
 service/kube-prometheus-stack-prometheus-node-exporter   ClusterIP   10.43.184.141   <none>        9100/TCP                        4m44s
 service/prometheus-operated                              ClusterIP   None            <none>        9090/TCP                        4m37s
-
-NAME                                                                                                                         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
-persistentvolumeclaim/alertmanager-kube-prometheus-stack-alertmanager-db-alertmanager-kube-prometheus-stack-alertmanager-0   Bound    pvc-2396564f-7983-4bc8-bbea-b34a34bb579c   5Gi        RWO            local-path     <unset>                 4m38s
-persistentvolumeclaim/kube-prometheus-stack-grafana                                                                          Bound    pvc-044a7e71-8d2f-4aa0-bc0d-798dcaf786ac   10Gi       RWO            local-path     <unset>                 4m44s
-persistentvolumeclaim/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0           Bound    pvc-13b33068-8653-4768-a84d-9d3296700034   20Gi       RWO            local-path     <unset>                 4m37s
 
 kubectl get prometheus,servicemonitors,alertmanagers -n monitoring
 NAME                                                            READY   STATUS    RESTARTS   AGE
@@ -323,38 +310,12 @@ service/kube-prometheus-stack-prometheus                 NodePort    10.43.55.19
 service/kube-prometheus-stack-prometheus-node-exporter   ClusterIP   10.43.184.141   <none>        9100/TCP                        4m44s
 service/prometheus-operated                              ClusterIP   None            <none>        9090/TCP                        4m37s
 
-NAME                                                                                                                         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
-persistentvolumeclaim/alertmanager-kube-prometheus-stack-alertmanager-db-alertmanager-kube-prometheus-stack-alertmanager-0   Bound    pvc-2396564f-7983-4bc8-bbea-b34a34bb579c   5Gi        RWO            local-path     <unset>                 4m38s
-persistentvolumeclaim/kube-prometheus-stack-grafana                                                                          Bound    pvc-044a7e71-8d2f-4aa0-bc0d-798dcaf786ac   10Gi       RWO            local-path     <unset>                 4m44s
-persistentvolumeclaim/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0           Bound    pvc-13b33068-8653-4768-a84d-9d3296700034   20Gi       RWO            local-path     <unset>                 4m37s
-[kwx4957@llm-d ~]$
-[kwx4957@llm-d ~]$ kubectl get prometheus,servicemonitors,alertmanagers -n monitoring
-
-NAME                                                                VERSION              DESIRED   READY   RECONCILED   AVAILABLE   AGE
-prometheus.monitoring.coreos.com/kube-prometheus-stack-prometheus   v3.13.0-distroless   1         1       True         True        5m50s
-
-NAME                                                                                  AGE
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-alertmanager               5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-apiserver                  5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-coredns                    5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-grafana                    5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-kube-controller-manager    5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-kube-proxy                 5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-kube-scheduler             5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-kube-state-metrics         5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-kubelet                    5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-operator                   5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-prometheus                 5m50s
-servicemonitor.monitoring.coreos.com/kube-prometheus-stack-prometheus-node-exporter   5m50s
-
-NAME                                                                    VERSION   REPLICAS   READY   RECONCILED   AVAILABLE   AGE
-alertmanager.monitoring.coreos.com/kube-prometheus-stack-alertmanager   v0.33.0   1          1       True         True        5m50s
-
 # prometheus
 open http://$MY_IP:30001
 # grafana : admin / prom-operator
 open http://$MY_IP:30002
 
+# 대쉬보드 구축 
 curl -L \
   https://grafana.com/api/dashboards/12239/revisions/latest/download \
   -o dashboard-12239.json
@@ -363,6 +324,7 @@ curl -L \
   https://grafana.com/api/dashboards/23382/revisions/latest/download \
   -o dashboard-23382.json
 
+# 기존 데이터소스 설정 불일치 문제 해결
 PROMETHEUS_UID=prometheus
 curl -fsSL \
   https://grafana.com/api/dashboards/12239/revisions/latest/download \
@@ -393,7 +355,8 @@ jq --arg uid "$PROMETHEUS_UID" '
   )
   | del(.__inputs)
 ' dashboard-23382.raw.json > dashboard-23382.json
-  
+
+# json 그라파나 대쉬보드 반영
 kubectl create configmap grafana-dashboard-dcgm-12239 \
   -n monitoring \
   --from-file=dcgm-exporter-dashboard.json=dashboard-12239.json \
@@ -409,24 +372,18 @@ grafana-dashboard-dcgm-12239                              1      35s
 grafana-dashboard-dcgm-23382                              1      34s
 ```
 
-
-
-
 ### Hami
 
 ```sh
-NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-
-kubectl label nodes ${NODE_NAME} gpu=on
-
-# 엔비디아 디바이스 플러그인 충돌 방지를 위한 false 처리 
+# 엔비디아 디바이스 플러그인 hami 충돌 방지를 위한 false 처리, 
 helm upgrade gpu-operator nvidia/gpu-operator \
   --namespace gpu-operator \
   --reuse-values \
   --set devicePlugin.enabled=false
 
 # 노드 라벨링 추가
-kubectl label node llm-d gpu=on --overwrite
+NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+kubectl label nodes ${NODE_NAME} gpu=on
 
 helm repo add hami-charts https://project-hami.github.io/HAMi/
 helm repo update
@@ -438,6 +395,7 @@ devicePlugin:
     extraArgs:
     - -v=4
     - --metrics-bind-address=:9394
+  # k3s의 경우 해당 설정 추가, 없으시 배포 실패 
   nvidiaDriverRoot: /run/nvidia/driver
   nvidiaHookPath: /usr/local/nvidia/toolkit/nvidia-ctk
   runtimeClassName: nvidia
@@ -472,6 +430,7 @@ scheduler:
 curl -fsSLo hami-vgpu-dashboard.json \
   https://project-hami.io/assets/files/gpu-dashboard-1f1ee85b9fb124c57657b807e42d0f0b.json
 
+# 하미 그라파나 대쉬보드 생성
 kubectl create configmap grafana-dashboard-hami-vgpu \
   --namespace monitoring \
   --from-file=hami-vgpu-dashboard.json=hami-vgpu-dashboard.json \

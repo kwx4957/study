@@ -1,4 +1,5 @@
 ## LLM Serving 스터디 7주차
+> G2 vram 24gb, rocky linux base GPU 기반 LLM Serving 환경을 Kubernetes 위에 구성하고, GPU 스케줄링·모니터링·모델 스토리지·Inference-aware Routing까지 연결하는 전체 Serving Stack 실습 
 
 ### 목차 
 - [1. VM 생성을 위한 GCP VM 설정](#VM-생성을-위한-GCP-설정)
@@ -17,7 +18,8 @@ gcloud init --console-only
 export PROJECT_ID="$(gcloud config get-value project)"
 export VM_NAME="lld-d"
 export MACHINE_TYPE="g2-standard-4"
-export IMAGE_FAMILY="rocky-linux-9-optimized-gcp"
+# gcp기반 최적화를 사용하지 말고 일반 리눅스를 사용해야한다. 최적화를 사용할 경우 nvidia 오퍼레이터가 실행되지 못한다
+export IMAGE_FAMILY="rocky-linux-9"
 export IMAGE_PROJECT="rocky-linux-cloud"
 export DISK_SIZE=100
 
@@ -48,7 +50,8 @@ export MY_IP=$(curl -4 -s ifconfig.me)
 # 내 IP에 대해서만 방화벽 개방 
 # 30001 : 프로메테우스
 # 30002 : 그라파나
-# 30003 : minio 
+# 30003 : minio
+# 30004 : vllm
 gcloud compute firewall-rules create allow-workshop-my-ip \
 --project="$PROJECT_ID" \
 --network="$NETWORK" \
@@ -885,7 +888,7 @@ curl -s http://${MY_IP}:30004/v1/chat/completions \
 
 ### llm-d
 전체 구조  
-AIGatewayRoute가 vllm pod를 고르지 않rh InferencePool-> EPP를 거쳐 vllm pod의 엔드포인트를 서택한다. 
+AIGatewayRoute가 vllm pod를 고르지 않고 InferencePool-> EPP를 거쳐 vllm pod의 엔드포인트를 선택한다. 
 ```sh
 Client
   ↓
